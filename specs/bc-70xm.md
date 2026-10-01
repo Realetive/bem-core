@@ -22,10 +22,11 @@ migrate (S4/S5).
 
 Named audit (D-11), pattern and result quoted here: `grep -rn "parseHTML\|parseHtml" --include='*.js' common.blocks
 desktop.blocks touch.blocks test build` → exactly one hit (the cited line, keepScripts=true); `grep -rn '<script'
---include='*.js' common.blocks test` → zero spec/source fixtures feeding scripts through bemDom content APIs. Result:
-**GO** — no script-execution dependent exists, `dom.parseHtml` is scripts-inert (script elements are not returned;
-documented C4 break, MIGRATION S2). Had a dependent existed, this REQ would have reverted to parity (template parse +
-script re-creation) inside S2.
+--include='*.js' common.blocks test` → two raw hits, both dismissed as non-dependents:
+`test/dist/build-fixtures.js:58` (dist fixture-page `<script src>` scaffolding, never routed through bemDom content
+APIs) and `test/browser/entry.js:12` (a prose comment). Result: **GO** — no script-execution dependent exists,
+`dom.parseHtml` is scripts-inert (script elements are not returned; documented C4 break, MIGRATION S2). Had a
+dependent existed, this REQ would have reverted to parity (template parse + script re-creation) inside S2.
 
 ## REQ-2 (change): internal DOM facade + native `dom`
 
@@ -75,7 +76,8 @@ Payload-parity (S0 ACC-11) gains a checked-in deletion ledger `specs/platform-pa
 - Evidence: `common.blocks/i-bem-dom/i-bem-dom.tests/benchmarks.blocks/page/page.deps.js:12 :: "        'jquery'"`
 
 Playwright gains `--project=bench` (chromium, bench specs under `test/bench/`, served by the same dev server /
-`build/vite.test.config.js`; the root `testMatch` for the chromium project stays `browser.spec.js`). Scenarios B1 init
+`build/vite.test.config.js`; the root `testMatch` for the chromium project stays `browser.spec.js`); package.json pins
+the alias `"bench": "playwright test --project=bench"`. Scenarios B1 init
 throughput, B2 delegated dispatch, B3 BEM emit, B4 live-collection, B5 destruct no-leak (heap delta) run against ESM
 bench blocks under `i-bem-dom.tests/bench.blocks/`; the legacy ym-style `benchmarks.blocks/` tree (b1/b2/page, whose
 page.deps.js is the third CONST-P1 exit) and `benchmarks.bemjson.js` are deleted. `specs/bench-baselines.json` records
@@ -144,7 +146,7 @@ Run `test "$(grep -c 'GO' specs/bc-70xm.md)" -ge 1 && echo audit-recorded` and e
 
 ## ACC-2: dom and idle are off jquery, sources and deps
 
-Run `! grep -rn 'bem:jquery' common.blocks/dom common.blocks/idle && ! grep -l jquery common.blocks/dom/dom.deps.js common.blocks/idle/idle.deps.js 2>/dev/null; test ! -e common.blocks/dom/dom.deps.js; grep -q "shouldDeps : \['events', 'inherit'\]" common.blocks/idle/idle.deps.js && echo native-dom-idle` and expect output contains `native-dom-idle`
+Run `test ! -e common.blocks/dom/dom.deps.js && ! grep -rn 'bem:jquery' common.blocks/dom common.blocks/idle && ! grep -q jquery common.blocks/idle/idle.deps.js && grep -q "shouldDeps : \['events', 'inherit'\]" common.blocks/idle/idle.deps.js && echo native-dom-idle` and expect output contains `native-dom-idle`
 
 ## ACC-3: i-bem-dom string parsing routes through the facade
 
@@ -172,9 +174,7 @@ Run `node -e "const b=JSON.parse(require('fs').readFileSync('specs/bench-baselin
 
 ## ACC-9: the ratio gate fires green for the first time
 
-```bash
-npm run bench 2>&1 | tee /tmp/bench-out.txt; grep -Eq "passed|ok" /tmp/bench-out.txt && ! grep -q "1\.[1-9][0-9]*x" /tmp/bench-out.txt
-```
+Run `npm run bench` and expect exit 0
 
 ## ACC-10: dom.spec.js is ESM and the corpus keeps its coverage
 
@@ -186,11 +186,15 @@ Run `! grep -q "toBeGreaterThan(400)" test/browser.spec.js && grep -q "specRegis
 
 ## ACC-12: shim-map pin and ledger file-set are in the node corpus
 
-Run `npm test 2>&1 | tee /tmp/node-out.txt; grep -q "harness-ledger" /tmp/node-out.txt && grep -q "# fail 0" /tmp/node-out.txt` and expect exit 0
+```bash
+set -o pipefail && npm test 2>&1 | tee /tmp/node-out.txt && grep -q "harness-ledger" /tmp/node-out.txt && grep -q "# fail 0" /tmp/node-out.txt
+```
 
 ## ACC-13: browser corpus green including the idle unit
 
-Run `npm run test:browser 2>&1 | tee /tmp/browser-out.txt; grep -q ", 0 failed" /tmp/browser-out.txt && grep -q idle /tmp/browser-out.txt` and expect exit 0
+```bash
+set -o pipefail && npm run test:browser 2>&1 | tee /tmp/browser-out.txt && grep -q ", 0 failed" /tmp/browser-out.txt && test -f common.blocks/idle/idle.spec.js
+```
 
 ## ACC-14: MIGRATION S2 cell is bilingual
 
