@@ -1,0 +1,412 @@
+# Design exploration (arch-overhaul): scale
+
+Leg: **scale** — bottlenecks, scale limits, degradation modes, caching.
+Repo grounded @ f2ab61e (branch v5). All sizes measured by building the real
+Vite 8 toolchain in a scratch clone (`npm run build`, production minify);
+jquery measured from installed `jquery@4.0.0` npm dist.
+
+## Summary
+
+- **Measured baseline (dist today, jquery EXTERNAL in build):**
+  desktop `bem-core.mjs` 37.88 kB raw / **10.96 kB gz** (77 modules); desktop
+  UMD `.js` 29.73 / 9.93. touch `bem-core.mjs` 39.52 / **11.69 gz** (76
+  modules); UMD 31.33 / 10.66. The jquery peer dep costs 78.75 kB min /
+  **27.53 kB gz** (slim: 56.03 / 19.44). A desktop consumer therefore pays
+  ≈ **38.5 kB gz** today (ESM + jquery), in ≥2 requests.
+- **After jquery removal**: native replacement (delegation engine + DOM
+  helpers + `<template>`-based parseHTML) is estimated to add +1–2 kB gz to
+  the library → consumer total ≈ **12–13 kB gz, a −66% cut (−25.5 kB gz)**,
+  one request, zero peer deps. PRD's "~30+ kB" claim is conservative; real
+  number is ~27.5 kB gz because jQuery 4 already shed IE-era code.
+- **Delegation engine**: recommend **per-scope native listeners + composedPath
+  walk with class-token bucketed matching** (Option B below). It preserves
+  today's anchoring semantics (listeners anchor at `bindScope` = instance
+  `domElem` or `bemDom.scope`, never `document`), keeps native-listener count
+  at O(scopes × event types), and absorbs the delegated self-match parity
+  quirk *by design* (path walk includes the root).
+- **Live collections**: today's index is 5 string-keyed **strong Maps**
+  (`uniqIdToDomElems`, `uniqIdToEntity`, `domNodesToParents`,
+  `domElemToParams`, `destructingDomNodes` — i-bem-dom.js:21-45). Detached
+  nodes that bypass `_destruct()` leak params forever. Recommend
+  `WeakMap<Node,…>` for node-keyed caches + a decomposed internal module
+  layout; keep lazy-compute + explicit invalidation (NO MutationObserver).
+- **Benchmarks**: keep per Q6, but the existing page is a ym-era init timer
+  (1000×(b1>b2), `Date.now`, jquery from a CDN in bemjson). Rebuild as a
+  Playwright-driven perf project measuring 6 pinned scenarios with
+  ratio-to-v5-base thresholds; wire it as the done-gate for the i-bem-dom
+  slices.
+- **Caching**: 4 concrete wins (memoize `_buildModValRE` per class+mod —
+  i-bem-dom.js:850 compiles a RegExp on every mod-cache miss; compile-once
+  selector matchers in the delegation engine; params JSON parse already
+  cached per node; entity index → WeakMap) and 2 honest non-wins (build-time
+  barrel graph caching — whole build is 3.5 s; env "recompute" API — UA
+  values are already computed once at module eval and are page-invariant,
+  except `ua.width/height/landscape` which must stay event-driven).
+- **Startup**: today 0 dynamic `import()`, 0 `modulepreload` (grep-verified).
+  Boot = fetch+eval one ~38 kB min file → `$(fn)` → `nextTick(init)` → one
+  `querySelectorAll('.i-bem')` wave. The loader slice (S3) is what
+  introduces `import()`/`modulepreload` semantics; the design should promise
+  "no loader waterfall, single init wave, modulepreload for eager deps" and
+  pin init time in the bench suite.
+
+## Key Considerations
+
+### 1. Bundle-size budget (numbers, gate, ownership)
+
+Measured table (production build of f2ab61e):
+
+| artifact | raw kB | gz kB |
+|---|---|---|
+| dist/desktop/bem-core.mjs | 37.88 | 10.96 |
+| dist/desktop/bem-core.js (UMD) | 29.73 | 9.93 |
+| dist/touch/bem-core.mjs | 39.52 | 11.69 |
+| dist/touch/bem-core.js (UMD) | 31.33 | 10.66 |
+| jquery@4.0.0 dist/jquery.min.js (peer) | 78.75 | 27.53 |
+| jquery@4.0.0 slim (peer alternative) | 56.03 | 19.44 |
+
+Consumer per-entry cost today (desktop, ESM) ≈ 10.96 + 27.53 = **38.49 kB
+gz**. Post-overhaul estimate: library grows by the native events engine +
+DOM helpers + a `<template>`-based `parseHTML` (~30 lines, replaces
+`$.parseHTML(html, null, true)` incl. keepScripts semantics — see
+Constraints) → ≈ 41–44 kB raw / **12–13 kB gz**, jquery gone. Savings
+**≈ 25.5–26.5 kB gz (−66%)** per entry; touch deltas are +0.7 kB gz vs
+desktop both before and after.
+
+Gate design (per-slice regression gate):
+- Checked-in `specs/bundle-budget.json`: `{ "desktop.mjs": 11000, "touch.mjs": 12000, ... }` in **gz bytes**, with a little headroom over measured (e.g. measured+10%).
+- `build/check-bundle-size.mjs`: runs after `npm run build`, gzips each
+  dist entry, compares vs budget, fails with a diff message. Mechanical,
+  sdd-check-able (C3): each slice's spec cites "budget check green".
+- **Ratchet semantics**: budgets may only shrink (or grow with an explicit
+  spec amendment naming the bytes and the reason) — mirrors CONST-P1 style.
+  At S7 (wrapper removal) tighten to the final post-removal caps.
+- Additionally assert **"no jquery in artifact"**: `grep -c "jQuery"
+  dist/*.mjs` == expected markers (0 for the no-compat-shim decision, Q2)
+  AND build config `external: ['jquery']` removed AND package.json
+  peerDependencies.jquery removed. This closes the review's G1 blind spot
+  (allowlist=∅ alone doesn't imply a jquery-free artifact).
+- Where it lives: CI job step + sdd-check block in the slice specs. Do NOT
+  put raw numbers in CONSTITUTION.md yet; promote after S7 freezes them.
+
+### 2. Tree-shaking reality (honest scope)
+
+Structurally dead today, by construction:
+- `build/platforms/{desktop,touch}.js` are ~35 **side-effect-only imports**
+  (`import 'bem:x'`) — the entry evaluates the whole library.
+- `generateBarrel` (vite-plugin-bem-levels.js:503-526) emits
+  `let _module = base; _module = redefN(_module); export default _module` —
+  a function call chain no bundler can eliminate, and semantically must not:
+  redefinitions legitimately mutate shared entity classes (decl culture).
+- `package.json` cannot declare `"sideEffects": false` — decl/registration
+  IS the side effect. `Object.freeze` and `/*#__PURE__*/` annotations are
+  red herrings for this graph shape (freeze doesn't enable elimination).
+
+What IS achievable and should be the design position:
+- US1 stays scoped to "no jQuery in bundle" (already the human-corrected
+  reading). Full-app tree-shaking is out of scope for the overhaul.
+- The **per-app tree-shaking story** already exists de facto: the plugin is
+  a public export (`./build/plugins/*`, fixed by b7ddd52) and `bem:`
+  specifiers only resolve through it — deep-importing
+  `bem-core/common.blocks/dom/dom.js` WITHOUT the plugin fails on its
+  `import 'bem:jquery'`. So consumers who want selective inclusion must use
+  the plugin in their own Vite config; apps get per-app module graphs with
+  the bundler's native dead-code elimination on top of the barrels. This
+  should be documented in the design doc as THE consumption model, and the
+  API-pinning test (slice-0) should pin the plugin export path.
+- Platform entries can stay side-effect barrels for full-library consumers;
+  no per-block re-exports need to be invented in this overhaul.
+
+### 3. Event delegation engine at scale (S4/S5)
+
+How it works today (verified in source):
+- Every EventManager binds via **jQuery at `bindScope`**
+  (i-bem-dom__events.js:81): `bindDomElem.on(event, bindSelector, data,
+  handler)` — jQuery installs ONE native listener per (root, eventType) and
+  matches selectors during dispatch. Scope = instance `domElem` or
+  `bDom.scope`(body) for class-level bindings (i-bem-dom.js:650,820).
+- Self-match quirk (i-bem-dom__events.js:82): when the bind root itself
+  matches the delegated selector, a SECOND direct `.on(event, handler)` is
+  added (`bindDomElem.is(bindSelector)`). Pinned by
+  events_type_dom.spec.js:877 ("should properly bind to self with
+  modifier").
+- BEM-type events are **synthetic**: `emit` triggers
+  `__bem__<entity>[_mod]` custom events on `ctx.domElem` and lets jQuery's
+  simulated bubbling walk the DOM; per-handler `$(e.target).closest()`
+  resolves instances (type_bem.js:61 — the source carries a TODO
+  acknowledging the per-handler closest cost), `flags.fns[fnId]` dedups
+  across bubbling, `flags.propagationStoppedDomNode` + `$.contains` emulate
+  cross-node stopPropagation, and `params.bindDomElem.index(e.target) < 0`
+  skips nested same-type blocks (#1525).
+
+Options (see next section) → **Option B**: per-scope native anchor +
+`composedPath()` walk + class-token bucketed matcher:
+- **Native listener count** = O(distinct scopes × distinct event types) —
+  identical to today's jQuery behavior (jQuery also anchors per bind root).
+  No global document listener for instance scopes → no cross-scope noise,
+  no containment checks needed, detached-scope GC story unchanged.
+- **Dispatch cost**: on native event at scope root, iterate
+  `e.composedPath()` from target to root; match via bucketed
+  `classList`-token lookup. BEM selectors are single-class
+  (`.block__elem_mod_val`) → compile each selector ONCE into a token
+  predicate (`Map<className, matcher>` per event type per scope) → O(path
+  nodes) per dispatch with O(1) class checks, vs jQuery's per-node selector
+  engine calls. Deep-DOM cost is bounded by subtree depth, not DOM size.
+- **add/remove binding** = O(1) Map ops on the scope's registry
+  (`Map<eventType, Map<selector, Set<handler>>>`); first binding of an
+  event type at a scope pays one `addEventListener`.
+- **focus/blur**: must map to `focusin`/`focusout` for delegation (native
+  focus/blur don't bubble) — exactly the normalization jQuery does
+  internally; expose as a small type-mapping table in the engine, covered
+  by spec tests (currently untested — chromium-only harness makes this
+  testable).
+- **BEM-type events**: per Q10 decision, replace `$.event.special` +
+  `.trigger()` with a pure registry: `Map<entityName, Set<binding>>`.
+  `_emit` walks **entity containment** (emitting entity's domNode →
+  ancestors via `parentElement`, resolving listener scopes through the
+  live-index), no DOM event objects at all. Complexity O(ancestor chain ×
+  bindings-for-entity) with entity-name bucketing → effectively O(depth).
+  The single shared `closest`-walk per emit (instead of per handler)
+  removes the acknowledged TODO cost.
+- Parity constraints that MUST carry over (spec corpus is the arbiter —
+  306 `it()` cases: events_type_dom 66, events_type_bem 109, i-bem-dom
+  131): positional trigger args (`fn(originalEvent, data)`),
+  `flags.fns` once-per-emit semantics, `propagationStoppedDomNode`
+  containment rule, #1525 nested-same-type skip, `e.bemTarget`
+  (= closest match for the *binding's* entity), `this` = resolved
+  instance, self-match inclusion, and data-`e.data` propagation.
+
+### 4. Live collection management at DOM scale
+
+What exists (this is NOT a MutationObserver system — "live" means
+lazy-compute + explicit invalidation):
+- Five module-level Maps (i-bem-dom.js:21-45) keyed by `identify()` strings
+  (counter expando, or Chromium `uniqueID` for nodes — identify.vanilla.js).
+- Per-instance caches: `_elemsCache`/`_elemCache` keyed elem+modPostfix
+  (i-bem-dom.js:349-356), `_findBackRefs` back-pointers for invalidation
+  (populated on every `_elems()`/`_elem()`, drained via `_onSetMod` →
+  `_dropElemCache` when `js` mod is torn down).
+- init wave: `findDomElem(ctx, '.i-bem')` = one `querySelectorAll` + filter
+  (i-bem-dom.js:1047), per-node `JSON.parse(data-bem)` **cached per node**
+  (`getParams`), entity creation dedup'd via uniqId maps.
+- destruct wave: reverse-order walk, `storeDomNodeParents` +
+  wholesale `domNodesToParents.clear()` (i-bem-dom.js:1093 — clears
+  entries even for unrelated concurrent destructs; benign today because the
+  map is only read… never read at all after the IE-era it guarded — dead
+  weight candidate).
+
+Degradation modes / leak classes found:
+1. `domElemToParams` is a **strong Map keyed by node-id strings** — any node
+   that leaves the DOM without passing through `_destruct` (raw
+   `innerHTML=` stomps, `remove()` by hand, navigation in SPAs that bypass
+   bemDom.update) leaks its parsed params + the string key forever.
+2. `uniqIdToEntity` holds entity instances (which hold jQuery collections →
+   nodes) until the LAST domNode is destructed; entity.domElem keeps
+   detached nodes alive in the interim.
+3. `_findBackRefs` grows monotonically per child (every parent that ever
+   cached it); invalidation only on js-mod teardown of the child.
+4. Repeated `bemDom.init(scope)` on the same ctx re-runs the selector scan
+   per call — O(subtree) per wave, fine for append-driven updates, the
+   hazard is app-level init-on-everything patterns.
+
+Recommendation for the decomposed internals (G5):
+- `dom-tree`: params extraction (WeakMap-cached), init/destruct waves.
+- `live-index`: `WeakMap<Node, entity>` + `WeakMap<Node, params>` — the
+  leak classes 1–2 disappear *by construction* (entries die with nodes);
+  `uniqId` indirection stays only for multi-node entities
+  (`Map<uniqId, Set<Node>>` still explicit-teardown owned).
+- `find-api`: find* family on top of live-index (same public behavior:
+  lazy init on match, `_findBackRefs` invalidation).
+- `events-dom`, `events-bem`: the two engines above.
+- `init-lifecycle`: `__init` registry (OQ5: explicit registry API beats
+  barrel-scanning redefinition — the barrels already made redefinition
+  build-time; init registry just enumerates `entities`).
+- Perf tests the benchmark suite must PIN before/after the i-bem-dom slice
+  (see §6): init throughput, dispatch throughput, destruct-no-leak.
+
+### 5. Caching / memoization inventory
+
+| target | today | recommendation |
+|---|---|---|
+| env/UA computation | computed once at module eval; platform-forked files | keep module-eval-once; env slice collapses forks to common+delta; `ua.width/height/landscape` stay event-driven (orientchange) — NOT memoized |
+| `_buildModValRE(modName)` | **new RegExp per call** (i-bem-dom.js:850-855; called on every `_extractModVal` = every mod-cache miss) | memoize in static `Map<class, Map<mod, RegExp>>` — trivial, hot path |
+| selector compilation (delegation engine) | jQuery re-parses selectors per dispatch | compile-once per selector string into class-token predicate; `Map<scope, Map<type, Map<token, bindings>>>` |
+| decl/entity composition | `entities` registry + one-time inherit chains at module eval; barrels make it build-time-static | already effectively cached; nothing to add at runtime |
+| data-bem params | cached per node (strong Map) | move to WeakMap (leak fix, slight lookup cost — bench it) |
+| channels (`events__channels`) | `Map` memoized forever, explicit `drop` | correct as-is |
+| loader in-flight dedup | `loading`/`loaded` Maps | correct as-is; S3 re-bases on `import()` (browser module map becomes the dedup) |
+| build-time barrel graph | registry cached per build, watch-invalidated | non-win: full build is 3.5 s; skip incremental caching |
+
+### 6. Benchmark strategy (Q6: keep + migrate)
+
+Current state: `i-bem-dom.tests/benchmarks.blocks` = 3 ym-authored blocks
+(b1 with delegated BEM-event binding on b2, b2 plain), bemjson with **1000
+b1>b2 pairs**, jquery loaded from yastatic CDN, page.js times a single
+`init()` with `Date.now()` and appends the number to body. Not runnable in
+the Playwright harness as-is.
+
+Design — one Playwright project (`--project=bench`), excluded from the
+default `>400` spec gate:
+- **B1 init throughput**: build the 1000×(b1>b2) tree from a vite-served
+  benchmarks page (no ym, no CDN); measure `bemDom.init()` wall time; report
+  nodes/ms; threshold = ratio vs `v5-base` run on the same machine class
+  (CI runners are noisy — pin ratios ≤1.10× first, absolute budgets later).
+- **B2 delegated DOM dispatch**: K=50 delegated bindings at a scope root,
+  synthesize N=1000 clicks on depth-20 nodes; ops/s. Catches walk-cost
+  regressions in the native engine vs jQuery.
+- **B3 BEM emit/dispatch**: emit on deep entity, 10 nested same-type
+  blocks (exercises #1525 path + flags dedup); ops/s + correctness asserts.
+- **B4 live-collection**: cold/warm `findChildBlocks` on 1000-child tree;
+  `_dropElemCache` invalidation cost on mod change.
+- **B5 destruct/detach**: 1000-node subtree `bemDom.destruct` cycles ×10;
+  heap delta via `performance.memory.usedJSHeapSize` (chromium-only is fine
+  per Q8) — must be ≈0 growth → pins the WeakMap migration.
+- **B6 startup**: module eval + auto-init time on a static page (Playwright
+  `page.goto` + performance marks); guards the loader/ESM slices.
+Runner mechanics: migrate benchmarks.blocks off ym/jquery inside the
+jquery-removal slice (per Q6); thresholds live in `specs/bench-budgets.json`
+next to the bundle budget; slice specs for S4/S5/S7 cite B1–B5 by id.
+
+### 7. Startup cost
+
+Today: static graph, no code splitting; `$(function(){ bemDom.scope=… })`
+(i-bem-dom.js:1214) and `__init_auto` = `$(function(){ nextTick(init) })`
+(8 lines). Boot cost = fetch 1 file (or 2 with jquery) + eval + one
+selector wave. After S3: `loader_type_js` semantics via `import()` (browser
+module map dedup, native error/timeout via Promise.race where the legacy
+API had none — review fixed the PRD's "timeout" claim), `modulepreload`
+for the platform entry's static deps when consumers split. The design
+promise: **no loader waterfall** (eager deps preloaded, dynamic deps
+optional), **single init wave** (unchanged), boot budget pinned by B6.
+Known cost center post-ESM: 77-module graph collapses to 1 file in the lib
+build, so eval cost ≈ minified size — already covered by the bundle budget.
+
+## Options Explored
+
+**Delegation engine:**
+- **A. Single document-level listener per event type + full selector walk.**
+  add/remove O(1); dispatch O(depth × all selectors) unless bucketed;
+  needs scope-containment checks to emulate per-scope semantics; global
+  listeners on high-frequency events cost even when no binding is in the
+  subtree. Rejected: changes anchoring semantics for negligible memory gain.
+- **B. Per-scope native listeners + composedPath walk + class-token
+  bucketing (chosen).** Listener count identical to today; dispatch
+  O(path) with O(1) class checks; self-match handled by inclusive path
+  walk (verify once-per-event parity in specs); focusin/focusout table for
+  focus delegation; scope GC story unchanged.
+- **C. Per-binding direct listeners (no delegation).** add/remove O(matches),
+  needs MutationObserver for correctness → semantics change + observer
+  storm risk on mutation-heavy pages. Rejected.
+- **BEM-type sub-option (Q10): pure registry + entity-containment walk
+  (chosen)** vs native bubbling emulation via real CustomEvents (rejected:
+  re-introduces DOM-coupled dispatch and the special-events machinery the
+  human decision removes).
+
+**Live index:** string-keyed strong Maps (status quo — leaks) vs
+**WeakMap-node-keyed (chosen)** vs WeakRef/FinalizationRegistry entity GC
+(rejected: nondeterministic teardown vs the explicit js-mod lifecycle).
+
+**Budget gate:** npm `size-limit` package (adds dep + config surface)
+vs **plain node script + gzip + JSON budgets (chosen)** vs vite-plugin
+output parsing only (rejected: not CI-checkable post-hoc).
+
+**Benchmarks:** standalone page + manual runs (rejected — unenforceable) vs
+**Playwright project with ratio thresholds (chosen)** vs node microbench
+(rejected: DOM engines need a real DOM; happy-dom/jsdom perf ≠ chromium).
+
+## Recommendation
+
+1. Adopt **Option B** delegation engine (per-scope anchor, composedPath
+   walk, compile-once class-token matchers, focusin/focusout mapping) and
+   the **pure-registry BEM events** per Q10, built test-first against the
+   306-case spec corpus; add focus-delegation spec coverage (new, small).
+2. Migrate node-keyed state to **WeakMaps** in the decomposed
+   `live-index`/`dom-tree` modules; keep lazy-compute + explicit
+   invalidation; delete the dead `domNodesToParents` wholesale-clear path.
+3. Land the **bundle budget gate** (specs/bundle-budget.json +
+   build/check-bundle-size.mjs + no-jquery-in-artifact assertion) in S0;
+   ratchet in every slice; final caps at S7: desktop/touch mjs ≤ ~13 kB gz.
+4. Rebuild **benchmarks as the Playwright bench project** (B1–B6) inside
+   the jquery-removal slice per Q6; ratio thresholds (≤1.10× vs v5-base)
+   until absolute numbers stabilize.
+5. Memoize `_buildModValRE` and selector compilation (cheap, hot);
+   document module-eval-once env caching; skip build-graph and env-recompute
+   APIs (non-wins).
+6. Tree-shaking: document the **"consumer runs vite-plugin-bem-levels"**
+   per-app graph model as the official selective-consumption story; keep
+   side-effect platform entries for full-library consumers; no
+   `sideEffects:false`, no per-block re-export work in this overhaul.
+7. Decompose i-bem-dom into `dom-tree / live-index / find-api / events-dom
+   / events-bem / init-lifecycle` behind the frozen public surface, with
+   B1–B5 as the before/after pins.
+
+## Constraints Identified
+
+- **Parity traps that constrain the delegation engine** (all pinned or
+  pinnable by specs): delegated self-match double-bind
+  (i-bem-dom__events.js:81-82 + spec:877); positional trigger args
+  (`fn(originalEvent, data)`); `flags.fns` per-emit dedup;
+  `propagationStoppedDomNode` + contains-check; #1525 nested same-type
+  skip; `e.bemTarget` and `this`=instance resolution; `focus/blur` →
+  focusin/focusout mapping; `$.parseHTML(html, null, true)` keepScripts
+  semantics must be reproduced by the `<template>`-based replacement
+  (scripts must EXECUTE — template.innerHTML does not run them; needs an
+  explicit execute step).
+- **CONST-P1 grep blind spot** (`(^|/)jquery/` filter hides
+  `desktop.blocks/jquery/*`) — the budget gate's artifact-level assertion
+  is the completion predicate, not the allowlist alone.
+- **`./*` export map makes every file deep-importable** → internal module
+  decomposition must not break file paths consumers might import; API-pin
+  test (slice-0) should whitelist the supported deep-import surface
+  (Q3 inventory) so CONST-P4 policing is mechanical.
+- **UMD artifacts** (dist/*.js) are still produced — CONST-P2 says no NEW
+  UMD; their fate needs an explicit S7 decision (keep building or drop the
+  format from the lib build). Budget gate covers whatever survives.
+- **`.vanilla.js` modules are env-agnostic** (i-bem is .vanilla) — engines
+  must not import node-only APIs into vanilla-reachable modules.
+- **Bench thresholds on shared CI runners are noisy** — ratio-based gates
+  only; absolute budgets only after dedicated-runner evidence.
+- **WeakMap lookup is ~1.5–2× slower than string Map** on hot paths (params
+  per dispatch) — acceptable after B2/B4 measurements confirm; keep
+  `uniqId` path for multi-node entities.
+
+## Open Questions
+
+1. Do final bundle caps get promoted into CONSTITUTION.md as an sdd-check
+   at S7, or stay in specs/bundle-budget.json with CI enforcement only?
+2. Absolute bench budgets: which runner class is the reference when
+   absolute thresholds replace ratios?
+3. `bemDom.scope` anchoring for class-level bindings after ESM-ification:
+   body (today) vs document.documentElement — semantics identical for
+   bubbling, but focusin at document level catches pre-body focus; pick and
+   pin in specs.
+4. parseHTML replacement: is executing scripts from
+   `bemDom.update(ctx, htmlString)` content actually load-bearing for any
+   in-repo consumer, or can keepScripts be dropped with a MIGRATION note
+   (CONST-P4)? Spec corpus has no positive script-execution test found —
+   needs a targeted grep/spec before S4.
+5. Should the bench project also run in the touch-emulated Playwright
+   project (Q8) or is desktop-parity sufficient for perf gates?
+6. UMD output: keep (some tooling wants a global `bemCore`) or drop with
+   the wrapper slice? Budget JSON shape depends on the answer.
+
+## Integration Points
+
+- **S0 (prerequisites)**: bundle-budget script + no-jquery assertion +
+  public-API pin test land here; v5-base tag (7a9e932) is the bench
+  baseline capture point (record B1–B6 baseline numbers into
+  specs/bench-budgets.json even though the harness migrates later).
+- **S1 (env/ua)**: module-eval-once caching position; `ua` deprecated
+  alias; orientchange-driven live fields contract.
+- **S2 (periphery + benchmarks)**: benchmarks.blocks migrate off
+  ym/jquery → becomes the B1–B6 harness; `dom` block folds its jQuery
+  surface into the DOM-facade contract (Q3 type decision).
+- **S3 (loader)**: `import()` semantics, modulepreload guidance, B6
+  startup pin; loader_type_bundle deleted (Q7).
+- **S4/S5 (events core / bem-type)**: Option B engine + registry; the
+  DOM-facade/event-facade contract (review's "specify before S2/S4")
+   is consumed here; spec corpus must stay green throughout.
+- **S7 (wrapper removal)**: final budget caps, UMD decision, allowlist=∅,
+  artifact-level no-jquery check turns conclusive; MIGRATION.md documents
+  `$.fn.bem` removal and the type-contract change.
+- **CONSTITUTION**: potential new sdd-check (bundle budget) follows the
+  CONST-P1 ratchet pattern; G6 override-only check unaffected by this leg.

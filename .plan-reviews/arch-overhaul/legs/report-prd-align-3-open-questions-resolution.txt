@@ -1,0 +1,102 @@
+# PRD-align-3 · open-questions-resolution
+
+review_id=arch-overhaul, review_phase=prd-align-3, review_leg=open-questions-resolution.
+Walked: PRD OQ1–OQ9 (vs binding Q1–Q10 answers), design-OQ 1–9 + "Retired during prd-align-1", and a full-body deferral scan ("?", TBD, decide/ratify/working-position/deferred). Inputs read in full: prd-draft.md, design-doc.md (current post-align-2 text), prd-align-round-1/2.md, CONSTITUTION.md. Repo evidence re-verified read-only @ f2ab61e (= confirmed HEAD).
+
+## Summary
+
+The question inventory is 17 of 18 fully dispositioned. All 9 PRD OQs are ANSWERED or RETIRED with visible carriers in the design doc; 8 of 9 design-OQs are explicit deferrals with a named slice + (mostly) a working position. One design-OQ fails the deferral contract: OQ-5 (shim-map ratchet home) names a decision RULE ("decide by whether non-owner agents may edit entry.js") but no deciding slice, owner, timing, or working position — while the first shim-map ratchet entries can land as early as S2's Harness Δ. That is the only [must-fix]. Eight [should-fix] items are explicitness/count/pointer drift: one orphan deferral in body text missing from the inventory (bada/wp env fields), a "three Q10 caveats" count that disagrees with the four enumerated parity items, an unnamed "named future phase" (inherit native-class options), three OQs missing a labeled working position (1, 3, 6 — positions exist in body text but aren't labeled in the OQ), the PRD OQ7 (dom fate) disposition being implicit-only, and one S5/S6 plugin-removal label drift. Retired items re-verified and still accurate: OQ3 pointer (grep @ f2ab61e: zero code matches, only functions.{en,ru}.md prose) and G3 timeout (no timeout in loader_type_js; the 30s LOADING_TIMEOUT lives in loader_type_bundle, which Q7 deletes anyway). Ratchet arithmetic closes: CONST-P1 9−1−3−2−3=∅ (after S5); CONST-P6 7 groups/12 files −3−1−3=∅ (after S6). After F1 (+F2) the inventory is fully dispositioned for handoff to plan-review.
+
+## Resolution matrix (question → status → carrier section)
+
+### PRD OQ1–OQ9
+
+| Q | Status | Answer / disposition | Carrier(s) in design doc |
+|---|---|---|---|
+| OQ1 wrapper fate (delete vs compat shim + EOL) | ANSWERED | Q2: delete outright, no shim | D-1; Exec Summary; S6 row; DOM type contract ($(node).bem() migration line) |
+| OQ2 ua shape + what consumers read today | ANSWERED | Q5: env public module scoped to audited inventory; ua one-release deprecated alias | KC-1, KC-2, D-13, "env / ua surface", S1 row; field-disposition completeness covers bada/wp (see F2) |
+| OQ3 pointerevent normalization ownership | RETIRED (prd-align-1) | moot — zero pointer code | "Retired during prd-align-1" + KC-6 reconciliation note; evidence re-verified @ f2ab61e |
+| OQ4 inherit keep/wrap/migrate; decl sugar | ANSWERED | Q4=a: freeze internal; native-class options deferred | D-2; Exec Summary; S0 row ("inherit freeze recorded"); Design position 2 + deep-import inventory (internal-but-tolerated); wording nit → F4 |
+| OQ5 init dynamic redefinition (final arch vs registry API) | ANSWERED | design decision: platform entries generated from scan registry; runtime = decl* side effects; explicit register() rejected (spec:1813 parity needs entities mutation) | D-8, KC-8, Data Model 3 |
+| OQ6 loader_type_bundle | ANSWERED | Q7: delete, bilingual note, zero in-repo consumers | S3 row, KC-7 |
+| OQ7 dom block fate (merge into i-bem-dom vs public) | ANSWERED (implicit) | Q3: dom stays public; internals get a separate DOM facade | Interface root barrel (export { default as dom }), deep-import inventory, KC-3, S2 row — no explicit OQ7 tie → F8 |
+| OQ8 public API inventory; where documented/tested | ANSWERED | Q3: inventory in design doc; pin test makes CONST-P4 mechanical | Interface section (exports map, barrel, pinned deep-imports, DOM type contract), D-6/D-7, S0 row (api-pin test) |
+| OQ9 benchmarks migrate vs delete | ANSWERED | Q6: keep + migrate inside its jquery-removal slice; perf harness for S4/S5 | S2 row (−3 incl. benchmarks page), KC-11, D-10, Risks; scheduling residue → design-OQ 1 |
+
+### Design-OQ 1–9
+
+| # | Topic | Status | Decision point | Working position |
+|---|---|---|---|---|
+| 1 | bench CI per-push vs scheduled | DEFERRED-EXPLICIT | S2 spec-craft | not labeled in OQ; CI wiring commits to per-push → F5 |
+| 2 | final bundle caps home (JSON+CI vs constitution) | DEFERRED-EXPLICIT | S6 | stated: JSON + CI; constitution keeps no-jquery predicate only — OK |
+| 3 | bemDom.scope anchor (body vs documentElement) | DEFERRED-EXPLICIT | S4 specs ("Pick + pin") | not labeled in OQ; DOM type contract implies body (parity) → F6 |
+| 4 | parseHTML scripts-inert vs parity | DEFERRED-EXPLICIT | first REQ of S2 (grep/spec audit) | stated: scripts-inert unless a dependent is found (D-11) — OK |
+| 5 | shim-map ratchet home (constitution vs plugin test) | DANGLING (deferral without concrete decision point) | none named — a rule, not a point | none stated → F1 [must-fix] |
+| 6 | keyboard__codes provision fate | DEFERRED-EXPLICIT | effectively the S0–S1 generation REQ (KC-8 binds: reproduce via payload-parity assertion or record fate); OQ text's "its slice" undefined for a Non-Goal-frozen block → F7 | stated: provision stays; silent drop forbidden — OK |
+| 7 | external reliance on inherit.self re-declaration | ANSWERED (S0) | S0 pin test records bem.entities mutation as internal | behavior preserved verbatim (Data Model 3, spec:1813) — OK |
+| 8 | env.browser legacy keys (opera/chrome) | DEFERRED-EXPLICIT | ratify in S1 spec | stated: one-release lifetime, die with ua alias — OK |
+| 9 | barrel naming + payload paths | DEFERRED-EXPLICIT | ratify in S0 spec | implied by Interface section as shown ("cosmetic") — OK |
+
+### Inline deferrals walked (body scan)
+
+| Deferral | Status | Notes |
+|---|---|---|
+| bada/wp encoded in env.platform, ratified S1 ("env / ua surface") | DEFERRED-EXPLICIT but ORPHAN — in no inventory | → F2 |
+| native-class inherit options = "a named future phase" (Exec Summary, D-2) | DEFERRED, phase never named | no slice needs it (inherit frozen) — honest in substance → F4 |
+| bench absolute budgets: post-series, optional, explicitly unscheduled (KC-11, Risks) | DEFERRED-EXPLICIT (prd-align-2 NG-F3 note) | not load-bearing — ratio thresholds gate S4/S5; no finding |
+| docs content redesign: post-6.0.0 (S6 row, Risks) | DEFERRED-EXPLICIT, named point | no finding |
+| loader timeout: dropped; "S3 spec's call" if ever wanted (semantics table) | RETIRED-adjacent; matched to Retired subsection (escape valve) | re-verified: loader_type_js timeout-free @ f2ab61e |
+| RTL/passive/input-modality env fields: Non-Goals until a consumer exists (KC-1) | matched to Q5's binding rule | no finding |
+| Node-24 revisit: only if a slice cites a dependency (CI wiring) | no-change disposition (prd-align-2 NG-F7) | no finding |
+| "an undecided classical-OOP inherit" (Problem Statement) | describes the pre-decision problem state; resolved by D-2 | not a dangling question |
+
+## Findings
+
+**F1 [must-fix] Design-OQ 5 — deferral without a concrete decision point.**
+Anchor: "## Open Questions" item 5 ("Shim-map ratchet home: constitution sdd-check vs plugin-test assertion — decide by whether non-owner agents may edit entry.js.") plus KC-12 and Implementation Plan TESTS item 4 ("Harness Δ — shim-map ratchet entries, count-floor policy changes, entry.js map edits").
+Why: the deferral contract is "which slice's spec-craft decides, what the working position is in the meantime". OQ-5 names a decision rule but no slice, owner, or timing, and states no working position — yet the first shim-map ratchet entries land with the first spec-converting slice (per-slice Harness Δ, earliest S2), i.e. the decision has in-series consumers.
+Suggested edit: rewrite OQ-5 to "Shim-map ratchet home: working position — plugin-test assertion (lives with vite-plugin-bem-levels tests; any slice may extend). Promote to a constitution sdd-check only if non-owner agents must be barred from editing entry.js. Decide at S0 spec-craft, before the first Harness Δ ratchet entry lands."
+
+**F2 [should-fix] Orphan deferral: bada/wp field disposition lives only in body text.**
+Anchor: "### env / ua surface" ("ua__dom also reads bada/wp for its platform modifiers; working position is they are encoded in env.platform (UA-derived, dedicated unit), ratified at S1 spec-craft") — added by prd-align-2 NG-F6 but never registered in the Open Questions inventory.
+Why: walk-3 rule — every body deferral must match an inventory entry or be added; this one is well-formed (S1 point + working position) but orphaned.
+Suggested edit: add as Open Question 10 ("env platform field encoding for bada/wp — ratify at S1 spec-craft; working position: encoded in env.platform") or fold into OQ-8's S1-ratify item with a cross-reference from the env/ua surface.
+
+**F3 [should-fix] "Three Q10 parity caveats" count vs four enumerated parity items.**
+Anchors: D-3 ("three caveats as named parity tests") and S5 row ("three Q10 parity caveats as named tests") vs KC-5 ("Parity contract: positional trigger args, flags.fns per-emit dedup, propagationStoppedDomNode containment rule, #1525 nested-same-type skip" = 4 items; Q10 names 3).
+Why: count/pointer drift; a spec-craft copying "three" under-pins the contract (#1525 becomes an unlabeled extra).
+Suggested edit: standardize on "four named parity tests: the three Q10 caveats (positional trigger args, flags.fns dedup, propagationStoppedDomNode containment) + the #1525 nested-same-type skip" in D-3, KC-5, and the S5 row.
+
+**F4 [should-fix] "A named future phase" is never named.**
+Anchors: Exec Summary ("native-class options are a named future phase"), D-2 ("native-class options a named future phase").
+Why: honest in substance (no slice consumes native-class options; inherit frozen per Q4) but "named" without a name is unverifiable; the docs pass by contrast names its deferral ("post-6.0.0").
+Suggested edit: name it — e.g. "a post-6.0.0 exploration convoy, opened only by a future PRD" — or drop "named".
+
+**F5 [should-fix] Design-OQ 1 lacks a stated working position; body text commits to one.**
+Anchors: OQ-1 ("per-push CI vs scheduled job — decide at S2 spec-craft") vs Implementation Plan CI wiring ("S2 — bench project." joining test-browser).
+Why: the CI wiring implies per-push as the working position; the OQ should state it rather than leave the default discoverable only by inference.
+Suggested edit: append "Working position: per-push (CI wiring line); a scheduled job is adopted only on runner-cost evidence, decided at S2 spec-craft."
+
+**F6 [should-fix] Design-OQ 3 lacks a labeled working position.**
+Anchors: OQ-3 ("Pick + pin in S4 specs") vs DOM type contract ("bemDom.scope/doc/win → lazy getters (body/document/window), never null").
+Why: body text implies body-anchor (today's semantics) while documentElement is the candidate catching pre-body focus via focusin; carry the interim position explicitly.
+Suggested edit: append "Working position: body (parity with today; see DOM type contract); document.documentElement is the candidate — pick + pin in S4 specs."
+
+**F7 [should-fix] Design-OQ 6's "its slice" is undefined for a Non-Goal-frozen block.**
+Anchor: OQ-6 ("stays until a spec exists or its slice decides fate. Keyboard internals are Non-Goal-frozen...") vs KC-8 (generation = S0–S1 tooling; "Generation must reproduce the keyboard__codes provision (payload-parity assertion) or record an explicit fate decision per OQ6").
+Why: keyboard has no slice by design, so "its slice decides fate" names a decision point that never arrives; the concrete point (S0/S1 generation REQ) lives only in KC-8.
+Suggested edit: reword OQ-6 to "stays; the S0/S1 generation REQ must either reproduce it (payload-parity assertion vs today's hand lists) or record the explicit fate decision (KC-8); silent drop via generation is forbidden; long-term fate revisited only by a future keyboard-spec convoy."
+
+**F8 [should-fix] PRD OQ7 (dom block fate) disposition is implicit only.**
+Anchors: PRD OQ7 ("does the tiny dom utility merge into i-bem-dom internals or stay public?"); carriers: Interface root barrel (export { default as dom }), deep-import inventory, KC-3 (internal DOM facade "surfaces through the bem:dom module graph"), S2 row ("dom/idle native").
+Why: the Q3 answer (dom is public) is visibly carried, but the design never addresses the "merge into i-bem-dom internals" half — the reader must infer internals got a separate facade instead. Answered-but-unclear.
+Suggested edit: one sentence in KC-3: "OQ7 disposition: dom stays public (Q3 inventory, root barrel); internal i-bem-dom helpers use this facade inside the bem:dom module graph — no merge into i-bem-dom internals."
+
+**F9 [should-fix] $(node).bem() removal label drift (S5/S6 vs S5).**
+Anchors: DOM type contract ("$(node).bem() plugin DELETED (S5/S6) — migrate to bemDom.initOnDom(...)") vs S5 row ("Pure-registry BEM events; $.fn.bem off"; slice titled "bem events + plugin") and S6 (wrapper deletion).
+Why: "(S5/S6)" reads as either/or; the slice table puts the plugin off at S5 and wrapper deletion at S6.
+Suggested edit: "DELETED at S5 (plugin off with the last jquery consumer; the wrapper itself is deleted at S6)".
+
+## Confidence
+
+High. All four inputs read end-to-end; the walk covered both inventories verbatim, a mechanical body scan (question marks → only optional-arg syntax and OQ-7's own text; no TBD; every decide/ratify/working-position/deferred hit dispositioned above), and cross-checks against both round logs (every prd-align-1/2 applied item accounted for; fixed items not re-litigated). Retired-evidence greps re-run @ f2ab61e (= confirmed HEAD): zero pointer code (prose-only md matches), loader_type_js timeout-free. Ratchet arithmetic re-verified (CONST-P1 9→∅ after S5; CONST-P6 7 groups/12 files→∅ after S6). Residual risk: F1's timing argument assumes the first Harness-Δ ratchet entries begin with the first spec-converting slice (S2; S0's api-pin is new ESM needing no shim) — if some S0 harness work converts specs earlier, F1 only becomes more urgent. Bottom line: F1 is the single gate to a fully-dispositioned question inventory; F2–F9 are explicitness/consistency polish, none blocking plan-review.

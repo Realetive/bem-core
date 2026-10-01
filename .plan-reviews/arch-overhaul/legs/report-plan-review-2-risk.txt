@@ -1,0 +1,251 @@
+# Plan-review-2 · risk — arch-overhaul (S0–S6 slice plan)
+
+## Summary
+
+The plan's risk posture is strong where it has already been stress-tested (S4×S5 interim
+interop, override-barrel TypeErrors, staged final gates, bench noise, doc rot): every one of
+those carries a named mitigation with an owning slice and a verifier. This round's findings
+concentrate where the existing Risks table does not reach: (1) an unscheduled hard dependency
+inside S6 — the test harness itself still imports jquery, and the deletion slice will discover
+it at its own binding commit; (2) S0's core bet (generated platform entries) names the what
+but not the how — artifact form, import ordering, drift detection are left to invention at
+spec-craft in the slice the whole fan-out waits on; (3) a set of small enumerated gaps (CORS
+row in the loader semantics table, S6 deletion completeness, touch test serving for S1) that
+are cheap now and reddening later. Two must-fix, eight should-fix; one timeboxed spike
+recommended. No rollback wedge found — the staged gates re-key correctly under reverts — but
+the revert protocol is implicit and should be stated.
+
+Lens coverage: technical (all 7 slice bets walked; S2/S4/S5 bets found well-mitigated —
+escape hatch + first-REQ audit, interop REQ + pre-authorized merge fallback, four named parity
+tests); dependency (6 walked; v5-base anchor re-verified valid: `git diff 7a9e932..f2ab61e`
+touches only CONSTITUTION.md + specs/.gitkeep — f2ab61e greps are a sound parity proxy);
+rollback (all 7 slices' revert stories walked; ledgers ride slice commits; hand lists
+recoverable from git history — no one-way doors); unknown-unknowns (deferred decisions
+inventoried and ranked — every spec-craft deferral has a decision point + working position,
+no fat deferral; the fat risks are slice sizing and one unbundled bundler unknown).
+
+Repo facts verified @ f2ab61e (branch v5): test/browser/entry.js:42 `import $ from 'jquery'`
++ shim-map entry `jquery: $` (:97); build/vite.test.config.js `optimizeDeps.include:
+[...,'jquery']` and hardcoded `platform: 'desktop'`; 25/25 spec files ym-authored
+(modules.define), 4 still require jquery via the shim (dom.spec.js 159L, i-bem-dom.spec.js
+1854L, __events_type_dom.spec.js 1069L, __events_type_bem.spec.js 1013L — the plan's own
+pinned-green citations); desktop.blocks/page/page.deps.js `shouldDeps: {elems:
+['conditional-comment']}` + page.tmpl-specs/60-conditional-comments.{bemjson.js,html};
+CONST-P1 grep is `--include='*.deps.js'` (harness invisible to the ratchet); wrapper =
+passthrough re-export of npm jquery; static `bem:` import edges verified (winresize →
+bem:ua+bem:jquery; __init_auto → bem:i-bem-dom__init+bem:jquery+bem:next-tick;
+__events_type_dom → bem:i-bem-dom__events+bem:inherit+bem:jquery); scan registry is a Map in
+readdirSync order; loader_type_js.spec.js is 33L; vite.config uses rolldownOptions (Vite 8).
+
+## Risk matrix
+
+| # | Risk | Likelihood | Impact | Existing mitigation verdict | Finding |
+|---|---|---|---|---|---|
+| R1 | S6 jquery devDep removal breaks browser CI: harness still imports jquery (entry.js shim + optimizeDeps); 4 ym spec corpora still require it via shim | Likely (certain if unowned) | High — S6 binding-red mid-slice; fattest slice grows further | Missing — final predicate's "sources+harness ∅" conjunct first binds at S6's own deletion commit; no earlier slice owns the harness exit | F1 [must-fix] |
+| R2 | S0 entry-generation mechanism unspecified (committed vs build-time artifact, import ordering, drift detection); readdir order is nondeterministic; parity assertion's comparison target undefined | Likely at spec-craft; silent-ish at runtime | High — S0 is the root of the whole fan-out | Prose only — "generated from the plugin's scan registry" names intent, not mechanism | F2 [must-fix] |
+| R3 | Loader semantic shift includes an un-tabled break: classic script injection loads cross-origin URLs without CORS; import() requires CORS on the target | Low (single consumer, audited) but fails silently at runtime | Medium | Partial — "internal-consumer audit" exists but its checklist does not name cross-origin | F3 [should-fix] |
+| R4 | S6 deletion list misses conditional-comment dependents (page.deps.js shouldDeps, 60-conditional-comments tmpl-spec pair, page.examples relics) | Likely | Low-Med — deps-lint (S0) / tmpl-spec red discovered mid-S6 | Partial — MIGRATION names elem + both templates, not the manifest/fixtures | F4 [should-fix] |
+| R5 | S1 touch-emulated acceptance has no serving path (vite.test.config hardcodes desktop; entry.js imports desktop modules only; no ua/env in shim) | Likely | Medium — S1 acceptance unverifiable, the exact Q8 failure mode | Partial — "touch-emulated Playwright project" named; serving mechanism not | F5 [should-fix] |
+| R6 | ua Proxy alias: destructuring/spread snapshots values, silently defeating live-forwarding | Low (frozen consumer rewritten in-slice; externals Low-rated) | Low | Partial — once-warn covers removed fields, not destructure semantics | F6 [should-fix] |
+| R7 | S0 at 12-REQ cap; overflow split contingency recorded only in review-round-1 log, not in the design doc / DAG line create-beads consumes | Medium | Medium — fan-out delay while S0 re-plans under three waiting slices | Log-only | F7 [should-fix] |
+| R8 | Non-tip single-slice reverts (esp. S2, S5 — outputs consumed by landed successors) are code-inconsistent; gates stay consistent (skip-mode) but CI reddens at build/test, misreadable as a gate bug | Low | Medium | Implicit — ratchets ride commits; protocol unstated | F8 [should-fix] |
+| R9 | Vite 8 / rolldown behavior for import(variableUrl) in dev-server harness + lib build unverified; discovered mid-S3 if it warns/errors | Medium | Medium — S3 rework or plugin carve-out under time pressure | None scheduled — no spike | F9 [should-fix, spike] |
+| R10 | Sizing: S3 4–6 excludes ES-module URL fixture work; S6 8–10 is the fattest slice and inherits F1's harness exit by default | Medium | Medium — over-cap slices; C2 pressure forces mid-flight splits | Estimates only | F10 [should-fix] |
+
+## Findings
+
+### F1 [must-fix] — S6's jquery removal has an unscheduled prerequisite: the test harness is a jquery consumer no slice owns
+
+Anchor: Slice series → S6 row ("jquery dev+peer deps gone … npm ci green") + Key Components 13
+("final multi-grep predicate (deps manifests ∅, sources+harness ∅, wrapper dirs gone,
+package.json clean)") + Implementation Plan TESTS item 4 (Harness Δ).
+
+The harness imports jquery in three places the allowlist cannot see (CONST-P1 greps only
+`*.deps.js`): entry.js's direct `import $ from 'jquery'` + shim-map entry `jquery: $`, and
+vite.test.config's `optimizeDeps.include: ['jquery']`. All 25 spec files are ym-authored; 4
+still require jquery through the shim — the same four corpora the plan cites as pinned-green
+through S5. KC 12's block-by-block conversion is never *required*, so a slice can keep its
+corpus ym-authored and green via the shim, leaving `jquery: $` alive past S5. The only
+detector is the final predicate's "sources+harness ∅" conjunct, which first binds at S6's own
+deletion commit — the discovery lands mid-S6, in the series' fattest slice.
+
+Suggested edit: S5 outcome cell + TESTS item 4 gain an explicit carrier — "harness exits
+jquery in S5: `__events_type_bem.spec.js` + `i-bem-dom.spec.js` converted to ESM (or
+re-authored against the S5 registry) AND the shim-map `jquery` entry, entry.js
+`import $ from 'jquery'`, and the vite.test.config optimizeDeps jquery line deleted in the
+same commit"; S2/S4 Harness Δ cells carry the analogous conversions (dom.spec.js /
+__events_type_dom.spec.js); S6 done-gate grep set gains "zero `jquery` imports repo-wide
+(sources, harness, configs)" so the final conjunct cannot surprise.
+Slices: S2, S4, S5, S6.
+
+### F2 [must-fix] — S0's entry-generation bet names the what, not the how (artifact, ordering, drift)
+
+Anchor: Key Components 8 ("platform entry modules **generated from the plugin's scan
+registry**; the hand-maintained lists … deleted in the same S0 commit, with the
+payload-parity assertion") + Slice series → S0 outcome cell.
+
+Three load-bearing details unspecified:
+1. Artifact form: vite.config consumes `build/platforms/${platform}.js` as lib.entry. After
+   the hand lists die, is the generated entry committed (lockfile-style — needs a freshness
+   check) or generated at build time (needs a prebuild step; parity assertion becomes a
+   build-time check)? Each answer changes the S0 REQ shape.
+2. Ordering: the scan registry is a Map built in readdirSync order (nondeterministic across
+   platforms). Set-parity is sufficient only because every cross-module dependency is a
+   static `bem:` import (verified @ f2ab61e: winresize, __init_auto, __events_type_dom all
+   import their deps) — the transitive ESM graph, not list order, carries evaluation order.
+   That argument is true today and written nowhere; a future side-effect module without a
+   static edge (the jquery__config-before-jquery pattern) would silently depend on emitted
+   order.
+3. Drift: if committed, CI must regenerate + diff, or the file rots exactly like the hand
+   lists D-8 cites as the motivation for generation.
+
+Suggested edit: KC 8 + S0 outcome cell gain one sentence each: "generation output committed
+at build/platforms/*.gen.js; imports emitted in canonical sorted order — sound because
+cross-module ordering is carried by static bem: import edges (verified); CI re-runs the
+generator and diffs (freshness); payload-parity assertion compares the emitted set against
+the checked-in pre-S0 baseline."
+Slices: S0 (mechanism); S2/S3 (deletions flow through it).
+
+### F3 [should-fix] — Loader semantics table omits the cross-origin/CORS break
+
+Anchor: Interface → Loader surface, semantics table + "Documented semantic shift: **ES
+modules only** — classic scripts defining globals no longer execute."
+
+Classic script injection loads cross-origin URLs with no CORS; dynamic import() requires CORS
+headers on the target. A consumer loading any third-party URL breaks at runtime with a
+network error even if the target is a valid ES module. The audit is the right mitigation but
+its checklist is undefined while the table — the design's canonical enumeration of semantic
+deltas — misses the row.
+
+Suggested edit: semantics table gains `| cross-origin script URLs (no CORS needed today) |
+behavior change — import() requires CORS on the target; S3 audit must confirm zero
+cross-origin loader URLs |`; S3 MIGRATION cell gains the line.
+Slices: S3.
+
+### F4 [should-fix] — S6 deletion list misses the conditional-comment dependents
+
+Anchor: Slice series → S6 row ("`page__conditional-comment` deleted — authorized template
+removal … MIGRATION entry names the elem and both template files") + KC 13.
+
+Evidence: desktop.blocks/page/page.deps.js declares `shouldDeps: {elems:
+['conditional-comment']}` (tmpl-spec tech); page.tmpl-specs/60-conditional-comments.{bemjson.js,html}
+exists; page.examples/40-es5-shims.bemjson.js rides the same examples tree. Deleting the elem
+without touching these leaves a dangling manifest reference the S0 `.deps.js` lint may flag
+and orphaned tmpl-spec fixtures.
+
+Suggested edit: S6 deletion enumeration gains "page.deps.js conditional-comment shouldDeps
+entry removed; 60-conditional-comments tmpl-spec pair deleted; page.examples relics checked".
+Slices: S6.
+
+### F5 [should-fix] — Touch-emulated S1 acceptance has no serving path
+
+Anchor: Slice series → S1 row ("touch-emulated Playwright project") + Implementation Plan CI
+wiring ("S1 — touch-emulated project to test-browser").
+
+Evidence: build/vite.test.config.js hardcodes `platform: 'desktop'`; test/browser/entry.js
+imports desktop-resolved modules only (no bem:ua / bem:env / bem:ua__dom in the shim map);
+playwright.config runs one webServer on :5174. Emulation-parity tests for the touch fork need
+a touch-platform serving context (second webServer/port or param'd config) plus entry/shim
+surface for ua/env — concrete harness work inside S1's 8–12 REQ that the cell does not name.
+This is precisely Q8's "slice-1 must not ship unverifiable" failure mode.
+
+Suggested edit: S1 TESTS cell gains "touch serving path (second webServer or param'd
+vite.test.config with platform=touch); entry/shim extended to ua/env for the emulation suite".
+Slices: S1.
+
+### F6 [should-fix] — Proxy alias: destructuring silently defeats live-forwarding
+
+Anchor: Key Components 2 ("live-forwarding to env") + Interface → env/ua surface.
+
+`const { msie } = ua` (or spread) snapshots once; the Proxy cannot warn or forward. Blast
+radius small (the frozen consumer ua__dom is rewritten in-slice; externals Low-rated per
+Q2), but the authoring rule should be pinned where the alias is documented.
+
+Suggested edit: env/ua surface gains "alias contract is property-read access; destructuring/
+spread snapshots are unsupported by design (noted in S1 spec)". Slices: S1.
+
+### F7 [should-fix] — S0's at-cap split contingency lives in a round log, not the plan being converted to beads
+
+Anchor: Implementation Plan ("Bead DAG for create-beads: 7 slice convoys …") +
+review-round-1.md ("if S0 spec-craft finds >12 REQs, the natural split-out is the
+generation+lint tooling cluster, which must still land before S1/S2/S3 fan-out").
+
+S0 lands at cap (12) carrying 15+ distinct outcomes (generation, deps-lint + entity-converter
+unification, plugin hard error, exports narrowing, barrel v1, pin test, bundle gate + budget
+spec + capped-artifact enumeration, doc fence + CI wiring, CONST-P6 skeleton + TWO
+constitution amendments, test/dist purge, tag, repository.url, Node floor). The pre-authorized
+overflow shape is recorded only in the coordinator's round log; the design doc and DAG line
+are silent, so create-beads builds a single at-cap S0 convoy and an overflow found at S0
+spec-craft becomes unplanned DAG surgery with three slices waiting.
+
+Suggested edit: Implementation Plan gains one sentence: "S0 overflow is pre-authorized to
+split into S0a (fence + contracts: barrel, pin, exports, gates, doc fence, constitution
+amendments) and S0b (generation + deps/entity-converter/plugin-lint tooling); both land
+before the S1/S2/S3 fan-out (S2/S3 strictly need S0b's generation; S1 needs S0a's
+barrel/pin)." Slices: S0.
+
+### F8 [should-fix] — Revert protocol is implicit: non-tip single-slice reverts redden CI without a wedge, and nobody wrote that down
+
+Anchor: Design positions 6 + KC 10 (two-directional ratchets) + Risks and Mitigations table.
+
+Walking each slice's revert story: ledgers/ratchets/budgets ride slice commits (revert
+restores both sides — consistent); staged gates re-key off git-tracked state (allowlist ≠ ∅
+after a revert → skip/preview mode; the round-1 re-keying is sound under revert); hand lists
+and all S0-generated artifacts are recoverable from git history — no one-way doors, no
+wedge. The residual hazard: reverting a non-tip slice whose outputs a landed successor
+consumes — concretely S2 (S4's engine builds on S2's facade) and S5 (S6's deletions assume
+S5's registry/init) — restores code that no longer links against the successor's rewrite;
+CI reddens at build/test, not at any gate, which an operator can misread as a gate bug.
+
+Suggested edit: Risks table gains a row: "Mid-series revert of a non-tip slice (S2/S5) vs
+landed successors | Medium | Reverts are stack reverts — reverting slice N with N+1 landed
+requires reverting N..M; gates self-consistent (skip-mode rebinds), red comes from code, not
+gates"; mirrored as a one-line revert note in the Implementation Plan. Slices: cross-cutting.
+
+### F9 [should-fix, spike] — One timeboxed spike retires the S3 bundler unknown now
+
+Anchor: Slice series → S3 row ("`import()`-based loader") + Key Components 8/9.
+
+The plan has exactly one external-runtime bet nobody has exercised: dynamic
+`import(variableUrl)` through Vite 8 / rolldown in both contexts that matter — the dev-server
+test harness (bundled, jquery-inlined) and the lib build. Rolldown's import analysis of
+non-analyzable specifiers can warn or error depending on config; if it errors, S3 needs a
+carve-out (`@vite-ignore` or equivalent) discovered mid-slice. A timeboxed S0-carried spike
+(one module importing a variable URL through both configs) converts unknown to documented
+behavior before S3 starts, and doubles as an early smoke test that generated entries survive
+both build paths.
+
+Suggested edit: S0 outcome cell gains "spike REQ (timeboxed): dynamic import(variable)
+through vite.test.config dev server + lib build; record rolldown behavior" (or a standalone
+investigation bead pre-S3). Slices: S0, S3.
+
+### F10 [should-fix] — Sizing: S3 and S6 carry hidden REQ mass (F1 lands in S6 by default)
+
+Anchor: Slice series table, REQ est column (S3 "4–6", S6 "8–10").
+
+S3's 4–6 excludes harness-side work its closure predicates imply (loader specs need servable
+ES-module URLs; the 33-line loader_type_js.spec.js corpus must grow promise-rejection +
+once-warn re-export suites). S6 is the series' fattest slice (deletion + enforcement +
+release prep + bounded README + docs pass + budget final caps + UMD drop + dev/peer removal +
+notices grep + MIGRATION/CHANGELOG consolidation) and by default also inherits F1's harness
+exit. Both are at over-cap risk with C2's ≤12 discipline as the only brake — mid-flight
+splits cost more than pre-authorized ones.
+
+Suggested edit: adopt F1 (moves the harness exit to S5); S3 TESTS enumeration gains
+"ES-module URL fixtures for loader specs" (floor nudges to 5–6); pre-authorize an S6 split
+(S6a deletion + enforcement + final gates; S6b release prep + docs/README + ledger
+consolidation) in the Implementation Plan, mirroring F7's S0 language. Slices: S3, S5, S6.
+
+## Confidence
+
+High on F1/F4/F5 and F2's evidence base (direct repo verification @ f2ab61e: harness
+imports, page.deps.js, vite.test.config, plugin scan mechanics, static import edges).
+Medium-high on F2's mechanism gap (the missing details are design-level, judged against what
+KC 8 and the S0 cell actually specify). Medium on F3/F6/F9 (CORS/Proxy/rolldown behavioral
+claims are standard-platform knowledge, not repo-verified; all three are cheaply falsifiable
+at spec-craft). F7/F8/F10 are planning-process judgments anchored in the round logs and the
+slice table's own arithmetic. All four lenses walked with findings; the technical lens found
+S2/S4/S5 bets well-mitigated as designed (escape hatch + first-REQ audit; interop REQ +
+mixed-flow test + pre-authorized merge fallback; four named parity tests) and the dependency
+lens endorses the existing Low ratings (v5-base proxy re-verified clean; Q2 hard-fork
+decision durable; jquery@4 peer/dev behavior mid-series covered by the staged-gate keying).

@@ -1,0 +1,469 @@
+# Design leg: ux — mental model, migration experience, error experience, docs examples
+
+Leg: `ux` · review_id: arch-overhaul · phase: design (PRD incl. human clarifications Q1–Q10, prd-review synthesis, CONSTITUTION.md; repo @ f2ab61e, branch v5).
+
+## Summary
+
+The v6 story is tellable in one paragraph, but the docs that must carry it are in
+worse shape than the PRD assumes: the local user guide (`common.docs/i-bem-js/`)
+still documents the **v4 API** (`BEMDOM.decl`, `bindTo`, `live`) across 9 files —
+it was never updated for v5 ESM, let alone the overhaul. Platform `ua` docs are
+**ru-only** (`desktop.blocks/ua/ua.ru.md`, `touch.blocks/ua/__dom/ua__dom.ru.md`;
+no .en.md twins). The root package export (`.` → `dist/desktop/bem-core.mjs`) is
+desktop-only, and the `"./*": "./*"` wildcard makes every repo file — including
+`.deps.js` and dev files — silently deep-importable, so "wrong import" is never an
+error today, it is a delayed runtime surprise. Error experience should therefore be
+designed as a **fail-fast inventory**: pinned export map + build-time plugin
+validation + one-release deprecation warnings on the `ua` alias. Migration docs are
+cheap if every slice lands its bilingual MIGRATION section as part of its REQ
+budget (en+ru pair = 1 REQ, parity-checked mechanically). For slice engineers (US4),
+the spec format that works is: numbered REQs ≤12, deps-on-earlier-slices, and
+machine-checkable done-criteria (sdd-check bash blocks: allowlist diff, test gate,
+MIGRATION anchor parity, grep evidence) pasted into the bead notes. Debuggability
+promise should stay minimal and honest: no runtime introspection API (CONST-P4);
+instead, provenance comments in generated barrels, a plugin registry dump recipe,
+and "the spec corpus is the executable map".
+
+## Key Considerations
+
+### K1. Who the users are and what each one reads first
+- **US1 (modern-stack consumer):** reads README → install → import. Today README
+  says "install jquery alongside" (README.md:18-22) — must die with the peer dep
+  (Q2). Their first import is `bem-core` root or a deep import; both shapes must be
+  documented in one table (see R1).
+- **US2 (frozen-consumer maintainer):** reads the block doc of the module they
+  migrate (`dom.en.md` signatures), MIGRATION.md for the type contract, and the
+  CONST-P1 allowlist to confirm their exit. Every signature doc that says
+  `{jQuery}` is a lie after Q3 (`dom.en.md` all 5 methods; `i-bem-dom` JSDoc
+  `scope/doc/win` at i-bem-dom.js:933-950; `bemDom.init/destruct/update/replace/
+  append/prepend/before/after` i-bem-dom.js:1080-1170 all take `{jQuery} ctx`).
+- **US3 (platform contributor):** reads README "Levels" section + needs the
+  override-only rule stated where they author files (G6). Today README.md:26-30
+  describes levels as "suited for"/"should be used for" — no override contract.
+- **US4 (slice engineer):** reads the slice spec; needs mechanical done-criteria
+  (C3) and the REQ counting rule stated once in the design doc glossary.
+- **US6 (legacy loader user):** reads loader docs + MIGRATION; today
+  `loader.en.md` even shows jQuery-download as the flagship example
+  (loader.en.md:61-73).
+
+### K2. The docs inventory is a real migration surface (bigger than PRD budget)
+- `common.docs/i-bem-js/` = the i-bem.js user guide (en+ru mirrored, SUMMARY.md is
+  the ru TOC). It documents **v4-era API**: `BEMDOM.decl`/`bindTo`/`live` appear in
+  i-bem-js-events.en.md (16 matches), -decl (9), -dom (5), -init (4), -context (3),
+  -states (3), -params (2), -html-binding (2), -interact (1). The v5 ESM migration
+  (MIGRATION.md "ym → ES modules") never touched this guide. The overhaul's docs
+  slice is therefore a **v4→v6 guide rewrite**, not a jQuery-swap.
+- jQuery-typed block docs: `common.blocks/dom/dom.en.md` (21 matches, every method),
+  `loader.en.md` (5), `jquery.en.md` (5, deleted with wrapper), `page.en.md` (1).
+- ru-only platform docs: `desktop.blocks/ua/ua.ru.md`, `touch.blocks/ua/ua.ru.md`,
+  `touch.blocks/ua/__dom/ua__dom.ru.md` — the env slice (S1) must add the missing
+  .en.md twins or the "bilingual parity" budget silently fails at the platform
+  level (prd-review "ru-rot is this repo family's historical failure mode").
+- `i-bem-dom.en.md` is a 7-line stub linking to the v4 guide on bem.info — the
+  natural home for a jquery-free quick-start example (see R4).
+
+### K3. Error modes today are silent or late (verified)
+- Export map (package.json:19-23): `"./*": "./*"` — any file importable, including
+  `bem-core/common.blocks/jquery/jquery.js` post-deletion would be ENOENT only at
+  runtime; desktop paths import fine into touch apps (silent wrong platform).
+- `vite-plugin-bem-levels.js` `load()` errors `BEM module not found: X` (line 592)
+  — correct failure but names neither the platform levels searched nor a fix.
+- `generateBarrel` (lines 503-526) calls every cross-level same-name entry ≥1 as a
+  function: `_module = redefId(_module)`. A redefinition not authored as
+  `export default function(prev)` builds fine and throws an anonymous
+  `TypeError: _X_redef0 is not a function` at first import of the virtual module.
+  `parseEsModule().isRedefinition` exists (line 185) but is **not consulted** by
+  `buildRegistry`/`generateBarrel` — validation is one branch away.
+- `ua.msie` is read by `jquery__event_type_winresize.js:9` (IE8-dead); desktop ua
+  exports `{chrome,version,webkit,...}`, touch exports a different shape entirely
+  `{ua,ios,iphone,...}` — same module name, two different public shapes per
+  platform. Dead-field reads are silent `undefined` today.
+- Module-eval-time environment reads: `touch.blocks/ua/ua.js` reads
+  `win.innerWidth/innerHeight/screen` at import time (lines 69-70, 155); `bemDom.
+  scope/doc/win` are `null` until the DOM-ready callback (i-bem-dom.js:1213-1217).
+  Pre-DOM-ready queries yield silent null/0 — no contract documented anywhere.
+
+### K4. Bilingual parity must be mechanically checkable or it will rot
+MIGRATION.md/MIGRATION.ru.md and every block doc pair (`.en.md`/`.ru.md`) drift
+historically. Parity needs a grep-able anchor convention (matching `###` section
+titles per version) so a slice's done-criteria can diff anchor counts between the
+en and ru files — prose parity stays human-reviewed, structure parity becomes
+mechanical.
+
+### K5. One release, no intermediate publishes (Q9) concentrates all UX risk at 6.0.0
+With a single `6.0.0` at the end, per-slice MIGRATION sections accumulate under one
+`## 6.0.0` heading — order sections by slice so the final doc reads
+chronologically. The deprecated `ua` alias (Q5: one release) is the only API whose
+error experience must work in-release (warning), everything else fails fast at
+build/import time by design.
+
+## Options Explored
+
+### O1. Where the mental-model story lives
+- **A. README only, guide keeps detail.** Cheapest; but README currently duplicates
+  a block list and links to bem.info v4 docs — stale on arrival.
+- **B. README rewrite + in-repo guide rewrite (common.docs) as the overhaul's docs
+  slice.** Treats the v4-legacy guide as part of the strangler surface; most honest
+  given K2; costs a dedicated slice-sized REQ budget.
+- **C. README + jsdoc regeneration only (`npm run docs`).** JSDoc exists but
+  signatures are jQuery-typed today; regenerating without the type-contract work
+  publishes wrong docs.
+→ Choose **B**, scoped: README rewrite is cheap and lands early (slice-0 adjacent);
+the full guide rewrite is its own work package inside the final docs/wrapper slice
+(S7) with the en/ru pair budgeted as 1 REQ per touched file group.
+
+### O2. `ua` deprecated-alias semantics (Q5)
+- **A. Alias object with only env-provided fields; dead fields simply absent**
+  (`ua.msie === undefined`). Zero magic, but silent — repeats K3's worst error mode.
+- **B. Alias with getter stubs on known-dead legacy fields that `console.warn` once
+  ("ua.msie was removed in 6.0; see MIGRATION ua→env") and return undefined.**
+  Small, dev-console-visible, deleted together with the alias at 7.0.
+- **C. Proxy over env warning on any unknown key.** Most thorough, most magic;
+  breaks shape introspection (`Object.keys`), perf-smell in hot paths.
+→ Choose **B** for the audited dead list only (msie, plus the touch/desktop fields
+that don't map to env); the list is small because Q5 scoped env strictly by the
+audited consumer inventory. No Proxy.
+
+### O3. Wrong-import error experience
+- **A. Keep `"./*"` wildcard forever.** Zero migration cost, zero protection.
+- **B. Pin the export map to the Q3 inventory (`./` per-platform entries,
+  `./*` enumerated public modules, `./build/plugins/*`); everything else
+  ERR_PACKAGE_PATH_NOT_EXPORTED.**
+- **C. Pin + per-platform subpaths (`bem-core/desktop`, `bem-core/touch`).**
+  Fixes the desktop-only root entry (K1/US1) and gives touch consumers a root.
+→ Choose **C**, staged: inventory + pinning test in slice-0 (prd-review Next
+Steps 4), full enumeration lands with the wrapper-removal slice when the final
+surface is known. Root-entry platform semantics need an api-leg decision (see OQ).
+
+### O4. Mis-authored redefinition detection
+- **A. Runtime only (status quo):** anonymous TypeError in virtual module.
+- **B. Build-time plugin validation:** in `buildRegistry`, for every module with
+  >1 entry, assert each entry ≥1 has a callable default export (reuse
+  `parseEsModule().isRedefinition` or a cheap `export default function` regex);
+  fail the build naming the file and the authoring contract
+  `export default function(prev) { ... }`.
+- **C. ESLint rule.** Wrong layer — needs cross-level knowledge the plugin already
+  has (levelIndex ordering).
+→ Choose **B**, landed early (it protects every slice that touches levels, not
+just S7; prd-review flags this hazard under "Important But Non-Blocking").
+
+### O5. Debuggability promise
+- **A. Runtime introspection API** (e.g. `bemDom.__debug.delegations()`) — new
+  public surface, CONST-P4 tension, Non-Goal ("no public API additions").
+- **B. Documented recipes only:** generated barrels carry provenance comments
+  (file + level per chained entry); a `registry dump` recipe via the plugin's
+  existing `api.getRegistry()` (vite-plugin-bem-levels.js:647-656); "the spec
+  corpus is the executable map" (i-bem-dom.spec.js 1854 L, events_type_dom
+  1069 L, events_type_bem 1013 L) with breakpoint guidance in the design doc.
+- **C. Dev-mode console flag.** Half of A with the same maintenance cost.
+→ Choose **B**. Extend `generateBarrel` header comment from `// @generated by
+vite-plugin-bem-levels` to list each contribution (`// level common.blocks: ...`),
+and add a "Debugging" section to the guide: where delegation attaches (scope
+listener + selector match in `__events_type_dom`), how to read a barrel, how to
+dump the registry in a Vite dev server. No runtime API promised.
+
+## Recommendation
+
+### R1. The one-paragraph story + README rewrite scope
+Story (drop-in for README "What is this?"):
+
+> bem-core is an ESM-first runtime for BEM components over the native DOM. Import
+> blocks as ES modules, declare behavior declaratively (`declBlock`, `onSetMods`),
+> and work with real DOM nodes — the public DOM contract is native
+> `Element`/`Element[]`, and there is no jQuery anywhere. The library lives in
+> `common.blocks`; `desktop.blocks`/`touch.blocks` are override-only refinement
+> layers composed at build time by `vite-plugin-bem-levels` (same-named modules
+> chain as `export default function(prev)`); the published package exposes a
+> pinned surface per platform through its export map.
+
+README.md + README.ru.md sections to touch (final docs slice, 1 REQ en+ru):
+- **Use:** drop the jquery install lines; add platform entry table
+  (`bem-core` root = desktop, `bem-core/touch` = touch, `./*` = enumerated public
+  modules, `./build/plugins/*`).
+- **Levels:** replace "suited for any devices" prose with the override-only
+  contract + pointer to the CI check (G6).
+- **Blocks list:** remove `jquery`, `ua`(JS); add `env`; mark `loader` (js-only),
+  keep `ua` as template-only block (CSS-class injection, common.blocks/ua/ua.en.md
+  behavior stays).
+- **API:** point to the in-repo public-API inventory (slice-0 deliverable) instead
+  of bem.info v4 links.
+- **Migration:** pointer to MIGRATION.md 6.0.0.
+- Badges/links: fix `repository.url` (Q9, slice-0) — README badge URLs inherit.
+
+### R2. MIGRATION.md skeleton (a): jQuery removal (S4/S5 land pieces, S7 completes)
+Append under `## 6.0.0` (MIGRATION.ru.md mirrored section-for-section):
+
+```markdown
+### jQuery removed
+
+bem-core no longer depends on jQuery. The public DOM contract is native
+`Element` / `Element[]`.
+
+#### The `jquery` block and peer dependency are deleted
+
+The `common.blocks/jquery` wrapper, the `jquery` peer dependency and the
+`jquery__event_type_*` extensions are removed. There is no compat shim.
+
+Before:                       After:
+npm i bem-core jquery@^4      npm i bem-core
+
+#### `$(node).bem()` plugin removed
+
+Before:
+import $ from 'jquery';
+import MyBlock from 'bem:my-block';
+const inst = $('.my-block').bem(MyBlock);
+
+After:
+import bemDom from 'bem:i-bem-dom';
+import MyBlock from 'bem:my-block';
+const node = document.querySelector('.my-block');
+const inst = bemDom.initOnDom(node, MyBlock);          // create+init
+const existing = bemDom.getFromDom(node, MyBlock);     // read w/o init
+
+#### DOM type contract: `Element` / `Element[]`
+
+| API                          | v5 (jQuery)        | v6 (native)        |
+|------------------------------|--------------------|--------------------|
+| `this.domElem`               | jQuery collection  | `Element[]`        |
+| `bemDom.scope` / `.doc` / `.win` | wrapped        | `body`/`document`/`window` |
+| `bemDom.init/destruct/update/replace/append/...` ctx | jQuery | `Element` |
+| `dom.contains(ctx, elem)`    | jQuery, jQuery     | `Element, Element` |
+| `dom.getFocused()`           | jQuery             | `Element \| null`  |
+
+Before:  $(e.currentTarget).attr('tabindex', '0');
+After:   e.currentTarget.setAttribute('tabindex', '0');
+
+If you kept your own jQuery collections over block DOM, migrate `.attr` →
+`setAttribute`, `.find` → `querySelector(All)`, `.on` → `addEventListener`, or
+keep jQuery in YOUR app (it is only dropped from bem-core internals and its
+peer dependencies).
+```
+
+Note the last line matters for US1 psychology: consumers may still use jQuery
+themselves; what changes is the library's contract, not their toolchain.
+
+### R3. MIGRATION.md skeleton (b): loader (S3)
+```markdown
+### loader_type_bundle deleted (en)
+
+The ym bundle loader is removed — the ym bundle format is dead and has no
+in-repo consumers. Build ES module output instead.
+
+ru mirror (MIGRATION.ru.md):
+### Загрузчик loader_type_bundle удалён
+Загрузчик ym-бандлов удалён (мёртвый формат, потребителей в репозитории нет).
+Используйте сборку в виде ES-модулей.
+
+### loader_type_js → dynamic import()
+
+The module keeps its `(path, success, error)` signature during the deprecation
+window, implemented on `import()`.
+
+Before:
+import loader from 'bem:loader_type_js';
+loader('https://example.com/app.js', onOk, onErr);
+
+After:
+try {
+    await import(/* @vite-ignore */ 'https://example.com/app.js');
+    onOk();
+} catch(err) {
+    onErr(err);
+}
+```
+The `/* @vite-ignore */` comment is required in bundler-built apps or Vite tries
+to resolve the URL at build time — this is exactly the kind of trap US6 hits;
+keep it in the doc. Also delete the jQuery-download example from
+`loader.en.md`/`loader.ru.md` in the same slice.
+
+### R4. Error experience: target table (design-doc deliverable)
+| # | Failure mode | Observable today | Should be (v6) | Produced where |
+|---|--------------|-------------------|----------------|----------------|
+| 1 | Import non-public path | Nothing — `"./*"` wildcard serves any file; failure deferred to runtime undefined/ENOENT | Node/bundler: `ERR_PACKAGE_PATH_NOT_EXPORTED` naming the path; README table lists public surface | package.json export map (S0 inventory → S7 pinning) + slice-0 API-pinning test |
+| 2 | Read dead `ua` field via alias | silent `undefined` (e.g. `ua.msie`, winresize-only) | one-time `console.warn("ua.msie is removed in 6.0 — see MIGRATION 'ua → env'")`, returns undefined; field table in MIGRATION | `common.blocks/ua/ua.js` deprecated alias (S1, option O2-B) |
+| 3 | env query before DOM ready | silent `null`/`0` (`bemDom.scope`, `ua.width` at eval time) | documented contract: static fields safe at import; viewport fields are lazy live getters (no stale value); block init still gated by `__init_auto` DOMContentLoaded — guide states it | env module (S1) + i-bem-dom docs; `bemDom.scope` becomes eager `document.body` after jQuery removal removes the ready-wait constraint — verify in S4/S5 |
+| 4 | Mis-authored redefinition (generateBarrel calls non-function) | build passes; anonymous `TypeError: _X_redef0 is not a function` in virtual module at runtime | build fails naming the file + contract snippet `export default function(prev) {...}` | `build/plugins/vite-plugin-bem-levels.js` buildRegistry validation (O4-B, land early) |
+| 5 | Desktop-only block into touch build | `bem:` import: terse "BEM module not found: X"; package deep import: silently loads desktop code | plugin error extended: "not found in levels [common.blocks, touch.blocks] for platform=touch — desktop-only?"; package: per-platform export paths make cross-platform deep import ERR_PACKAGE_PATH_NOT_EXPORTED | vite plugin `load()` error text (cheap, any slice) + export map (S0/S7) |
+
+### R5. Docs example pair for `i-bem-dom.en.md` (expand the 7-line stub)
+**Before (v5 docs idiom, jQuery-typed):**
+```js
+import bemDom from 'bem:i-bem-dom';
+import $ from 'bem:jquery';
+
+export default bemDom.declBlock('menu', {
+    onSetMod : {
+        'js' : {
+            'inited' : function() {
+                this._domEvents('item').on('pointerclick', this._onItemClick);
+            }
+        }
+    },
+    _onItemClick : function(e) {
+        $(e.currentTarget).attr('aria-current', 'true');   // jQuery habit
+        this.setMod('opened');                              // _elem() returns instance API
+    }
+});
+```
+**After (v6, jquery-free):**
+```js
+import bemDom from 'bem:i-bem-dom';
+
+export default bemDom.declBlock('menu', {
+    onSetMod : {
+        'js' : {
+            'inited' : function() {
+                this._domEvents('item').on('pointerclick', this._onItemClick);
+            }
+        }
+    },
+    _onItemClick : function(e) {
+        e.currentTarget.setAttribute('aria-current', 'true'); // native Element
+        this._elem('item').setMod('current', true);            // element instance
+    }
+});
+```
+Notes: `_domEvents()` usage is already the documented v5 form — the delta the
+example must teach is (1) no `bem:jquery` import anywhere, (2) `e.currentTarget`
+used natively, (3) `_elem()`/collections never were jQuery — say so explicitly to
+unseat the `$(this.elem(...))` habit the v4 guide taught. Mirror in
+`i-bem-dom.ru.md`.
+
+**env module docs location:** `common.blocks/env/env.{en,ru}.md` (block-doc
+convention). Examples show exactly the audited consumer inventory (Q5): platform
+fields feeding the touch `ua__dom` modifiers (ios/android/ios-subversion/
+screen-size/svg/orient), orientchange handling via `_domEvents(bemDom.win)`
+(bemDom.win = native `window` in v6). The deprecated `ua` gets a rewritten
+`common.blocks/ua/ua.{en,ru}.md`: deprecation notice + field-mapping table + link
+to MIGRATION. The ru-only platform docs (`touch.blocks/ua/__dom/ua__dom.ru.md`,
+`desktop.blocks/ua/ua.ru.md`) are deleted with the platform ua collapse (their
+content folds into env docs) — S1 REQ.
+
+### R6. Slice spec format for US4 (mechanical verification)
+Template (lives in `specs/slices/<id>.md`; specs/ is empty today — convention is
+a slice-0 decision, see OQ):
+
+```markdown
+# Slice S4: events core — native delegation + DOM type contract
+Depends: S2, S3 · Base branch: v5 · Anchor: tag v5-base ·
+Allowlist: 6 entries → 3 entries
+
+## Requirements (9 of max 12)
+REQ-1 Replace jQuery delegation in `i-bem-dom__events_type_dom` with a native
+     `addEventListener` engine; parity corpus: i-bem-dom.spec.js,
+     i-bem-dom__events_type_dom.spec.js (files listed; known parity traps:
+     delegated self-match, this=delegateTarget, e.bemTarget, positional
+     trigger args, parseHTML keepScripts).
+REQ-2 Change `bemDom.init/destruct/update/...` ctx type to `Element`;
+     update JSDoc.
+REQ-3 `dom` block signatures → Element; rewrite dom.{en,ru}.md examples.
+REQ-4 MIGRATION.md + MIGRATION.ru.md: append "### Events and the DOM type
+     contract" to 6.0.0 in BOTH files (en+ru pair = 1 REQ, parity-checked).
+REQ-5 … (each later REQ = one independently verifiable change)
+REQ-9 Allowlist shrink: remove exactly 3 entries (named) from CONST-P1 ALLOW.
+
+## Done-criteria (paste command + output as evidence into the slice bead)
+D-1 [sdd-check] CONST-P1 passes AND `grep -c` of ALLOW lines == expected
+    count; diff of CONSTITUTION.md vs v5-base shows only removals.
+D-2 `npm run test:all` green; `test/browser.spec.js` total >= previous
+    slice's recorded total (record the number in the bead).
+D-3 `diff <(grep -E '^#{2,3} ' MIGRATION.md) <(grep -E '^#{2,3} ' MIGRATION.ru.md)`
+    — section anchors match 1:1 (structural en/ru parity).
+D-4 `git diff v5-base..HEAD --stat -- '*.{en,ru}.md'` shows every touched
+    public file's language twin touched (no en-only edits).
+```
+
+Counting rule (design-doc glossary): a REQ is a numbered, independently
+verifiable statement; nested sub-steps fold into their parent; an en+ru doc pair
+is ONE REQ (one deliverable, one parity check); tests+implementation of one
+behavior = ONE REQ. Hard cap 12 per slice (C2); if a slice cannot fit, it splits.
+
+Verification loop for the engineer: run D-1..D-4 locally, paste outputs to the
+slice bead notes, then normal polecat→refinery flow. US5's before/after diff
+recipe = `git diff v5-base..<slice-merge> -- <files>` plus the recorded spec
+totals — keep a running "parity ledger" table in the design doc (slice → total
+tests → allowlist count) so reviewers see monotonicity without re-running history.
+
+### R7. Debuggability (per O5-B)
+- Barrels: extend `generateBarrel` to emit provenance comments per chained entry
+  (level + file). Zero runtime cost; makes "which entity class got composed from
+  which levels" readable in the dev-server module graph.
+- Delegation tracing: guide section "Debugging events": breakpoint guidance for
+  the native engine's scope-level listener and selector-match step (post-S4 the
+  whole chain is first-party code — strictly more debuggable than `$.event.special`
+  today; say so).
+- Registry dump recipe: `import bemLevels from 'bem-core/build/plugins/
+  vite-plugin-bem-levels.js'; pluginInstance.api.getRegistry()` in a Vite
+  dev-server snippet (API already exported, vite-plugin-bem-levels.js:647-656).
+- Explicit non-promise: no runtime introspection API; the spec corpus is the
+  executable map (name the three spec files).
+
+## Constraints Identified
+
+- **CONST-P4:** error-experience additions (ua alias getter-warns) are
+  deprecation-path only and die with the alias; the export-map pinning shrinks
+  surface → needs the documented migration table (R4 #1 ties path errors to the
+  inventory doc).
+- **CONST-P1/C3:** every allowlist shrink must appear as a done-criterion with
+  expected before/after counts (R6 D-1) — "shrinks by ~3" prose (PRD factual fix)
+  becomes exact numbers in the spec.
+- **C4/Q8:** touch ua work ships with a touch-emulated Playwright project — the
+  env docs examples (R5) must be runnable under it, or they document the
+  unverifiable.
+- **Q9 single 6.0.0:** all MIGRATION sections accumulate under one heading;
+  deprecation window for `ua` alias spans to 7.0 — MIGRATION must state the alias
+  EOL release explicitly.
+- **Non-Goal "no public API additions"** vs Q5 carve-out: env is a new public
+  module (explicit exception); the getter-warn stubs are internal to the alias
+  module, not new API.
+- **Bilingual budget:** 1 REQ per slice for doc pairs (R6 REQ-4 pattern); the
+  guide rewrite (O1-B) is the only place allowed to exceed — as its own slice.
+- **US1 tree-shaking:** README story must promise "no jQuery in your bundle"
+  (mechanical G1 predicate), not "tree-shaking works" (structurally hostile
+  today — side-effect platform entries; prd-review).
+
+## Open Questions
+
+1. **Root export platform semantics:** `.` is desktop-only today; if we add
+   `bem-core/touch` (O3-C), is `.` desktop-forever or a re-export throwing a
+   "specify platform" error? Needs the api leg + Q3 inventory decision.
+2. **`this.domElem` exact v6 shape:** `Element[]` always, or `Element` when
+   single-node? Affects every doc example (R4/R5 use `Element[]`; confirm with
+   api leg — multi-node entities exist via `domElem.add`).
+3. **Does `bemDom.scope/doc/win` stay eager after jQuery removal** (R4 row 3
+   assumes `document.body` at eval is safe pre-ready for `doc`/`win` but not
+   `scope`) — verify against `__init_auto` semantics in S4/S5 design.
+4. **specs/ convention:** slice specs in `specs/slices/` vs bead-notes-only (specs/
+   is empty; prd-review lists "specs/ location and template convention" as a
+   slice-0 deliverable) — pick before S1 so R6 has a home.
+5. **Guide hosting:** common.docs rewrite stays in-repo (SUMMARY.md book) or
+   moves to generated JSDoc+guide hybrid? Affects the docs-slice REQ count.
+6. **Warn-stub list for the ua alias:** exact dead-field inventory (msie +
+   which touch/desktop fields lack env mappings) — needs the S1 audited
+   consumer census output.
+7. **`browser.spec.js` `>400` gate policy** (test/browser.spec.js:35): replace
+   with recorded-total monotonicity (R6 D-2) or keep absolute floor? Harness
+   decision attached to S1/S5 (prd-review "Harness evolution").
+
+## Integration Points
+
+- **S0 (prerequisites):** export-map inventory + API-pinning test, `repository.url`
+  fix, specs/ convention — feeds R4 #1, R6, OQ-4.
+- **S1 (env/ua):** alias warn-stubs (O2-B), env docs + missing .en.md twins (R5),
+  ua__dom modifier examples runnable under the touch-emulated Playwright project.
+- **S2 (periphery):** `dom.{en,ru}.md` rewrite can land here instead of S4 if the
+  DOM-facade contract (prd-review "Order-of-work suggestion") is specified first —
+  coordinate with api leg.
+- **S3 (loader):** R3 skeletons + loader doc example purge.
+- **S4/S5 (events):** R2 type-contract table rows land incrementally; barrel
+  provenance comments (R7) land with the first native-engine slice.
+- **S6 (inherit freeze):** no UX surface beyond one MIGRATION line ("inherit is
+  internal; authoring API unchanged").
+- **S7 (platform + wrapper removal):** README rewrite (R1), export-map pinning,
+  jquery.en/ru.md deletion, guide rewrite slice (O1-B), final MIGRATION assembly
+  under `## 6.0.0`, allowlist=∅ evidence per G1 mechanical predicate.
+- **Cross-leg:** R4 #2/#3 and OQ-2/#3 belong to the api leg's type contract;
+  R6 template must be validated against the plan-review leg's DAG arithmetic
+  (7 slices, S0–S7); the error-table rows 1/5 depend on the integration leg's
+  export-map decisions.

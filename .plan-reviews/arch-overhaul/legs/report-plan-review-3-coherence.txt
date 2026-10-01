@@ -1,0 +1,93 @@
+# Plan-review-3 · coherence (arch-overhaul)
+
+Leg: coherence · review_id=arch-overhaul · review_phase=plan-review-3. Subject: `.designs/arch-overhaul/design-doc.md` @ plan-review-2 state (669L). Inputs read fully: prd-align rounds 1–3, review rounds 1–2, prd-draft.md, CONSTITUTION.md; repo @ f2ab61e read-only re-verification where load-bearing (package.json scripts, ci.yml job names, test/dist contents, specs/ absence, block-doc inventory, build/platforms hand lists, common.docs/i-bem-js, events/__observable).
+
+## Summary
+
+The doc is coherent in its load-bearing arithmetic and staging: CONST-P1 (9→∅), CONST-P6 (7 groups / 12 files → ∅), final-gate activation keying (wrapper existence + package.json cleanliness, never allowlist-∅ alone), harness-exit carriers (1/3, 2/3, 3/3 + S6 repo-wide grep), bench B1–B5, loader canonical path, exports/target paths, and header cut-notes vs body all restate one story (matrix below). Two must-fix gaps survived the six editing rounds: (1) the slice-table Deps column and the DAG-shape line encode **different edge sets** (S4, S6) — create-beads gets two different dependency lists depending on which section it trusts; (2) the **`>400` floor replacement** (per-file registration accounting + loose liveness floor) is promised in three sections and owned by no slice. Thirteen should-fix items follow (undefined S0 deliverable terms, parseHtml wording drift vs D-11, dangling "Option B", PRD/design OQ-number collision in header notes, env getter-list drift, S4/S5 Docs Δ carriers, unacknowledged S1∥S3 same-file barrel/pin edits, ua-alias removal timing, two-directional-ratchet mechanism home, stale D-16 phrase, stale pointerevent clause in the Problem Statement, tag create-vs-verify ambiguity). With the two must-fixes applied, 7 convoy specs (each ≤12 REQ) are writable from this text alone without invention.
+
+## Consistency matrix (section pair / identifier family → verdict)
+
+| # | Pair / family | Verdict |
+|---|---|---|
+| 1 | REQ estimates: slice table vs header notes (S0 11–12→10–11, S3 stays 4–6) vs round-2 log budget state | ✓ identical everywhere; all within ≤12 cap |
+| 2 | CONST-P1 arithmetic: Exec (9 → −1 S1, −3 S2, −2 S4, −3 S5 = ∅ after S5) vs Δ column vs CONSTITUTION allowlist (9 entries, verified) | ✓ exact |
+| 3 | CONST-P6 arithmetic: Exec / KC 13 (7 groups, 12 files) vs enumeration (1+2+2+2+1+2+2 = 12 ✓) vs S1/S2/S6 cells (−3/−1/−3 → ∅) | ✓ exact |
+| 4 | Final-gate staging: Exec vs KC 10 vs KC 13 vs header notes (final assertions activate at S6; keyed on wrapper existence + package.json cleanliness, not allowlist-∅; skip/preview + exit-0 guard form) | ✓ verbatim-consistent across all four |
+| 5 | Deps: DAG-shape line (L147) vs slice-table Deps column (S4 "S0, S2"; S6 "S1–S5") | ✗ two different edge sets — MF-1 |
+| 6 | S4+S5 merge fallback: Risks row 1 vs Implementation Plan ("S4 spec pre-authorizes"; two separately-gated internal stages, each ≤12) | ✓ |
+| 7 | Overflow splits S0a/S0b, S6a/S6b: header note vs Implementation Plan (both halves before fan-out; S2/S3 need S0b, S1 needs S0a; S6a before S6b) | ✓ |
+| 8 | Harness-exit carriers: S2 cell (1/3) vs S4 cell (2/3) vs S5 cell (3/3 + three harness sites in one commit) vs KC 12 vs TESTS item 4 vs S6 zero-jquery grep | ✓ all six agree |
+| 9 | Bench: KC 11 (B1–B5 enumerated, B6 cut, ≤1.10× ratio, done-gate for S4/S5) vs S2 cell (B1–B5 + v5-base capture) vs TESTS S2 vs WeakMap risk row (B2/B4) | ✓ |
+| 10 | Loader canonical path: KC 7 vs D-16 vs Interface barrel vs deep-import inventory vs S3 cell vs TESTS S3 vs header notes (`bem:loader` barrel switch at S3; `loader_type_js` mod path deleted outright, no bridge) | ✓ one story — except stale D-16 phrase (SF-11) |
+| 11 | Exports/target paths: Interface jsonc vs D-6 vs Design positions 1/3 vs S0 cell vs OQ-9 (`.`, `./dist/desktop`, `./dist/touch`, `./build/plugins/*`, `./common.blocks/*`) | ✓ |
+| 12 | Header cut notes vs body (`.deps.js` lint, entity-converter→S6 ride-along, Node floor, loader bridge, B6, explicit-throw, `_buildModValRE`) | ✓ every cut propagated to body; no phantom cuts; SC-1/SC-2 supersessions over C-F4 recorded chronologically in the notes themselves |
+| 13 | bemDom / BemDom / BEMDOM casing | ✓ intentional per D-7 + prd-align-3 US-F1; `BemDomCollection` kept; S6 docs remap consistently named |
+| 14 | `i-bem-dom` vs `i-bem-js` docs paths | ✓ intentional — v4 guide dir verified @ `common.docs/i-bem-js` |
+| 15 | Slice ids S0–S6 vs PRD-review S0–S7 | ✓ numbering note maps review-S6 → S0 REQ, review-S7 → S6 |
+| 16 | Artifact paths: `build/platforms/{desktop,touch}.js` hand lists (verified present) vs `build/platforms/*.gen.js` generation | ✓ deleted-in-S0 / committed-gen / CI freshness consistent in all restatements |
+| 17 | `test:browser` (Done-gate line, npm script) vs `test-browser` (CI wiring, S1) | ✓ not drift — npm script `test:browser` and CI job `test-browser` are both real names (package.json / ci.yml verified) |
+| 18 | `touch-emulated` naming (S1 cell, D-15, done-gate project flags, CI wiring S1) | ✓ |
+| 19 | `page__conditional-comment` / `page__icon` dispositions: KC 13 vs S6 cell (dependents enumerated: `page.deps.js` shouldDeps, tmpl-spec pair, `page.examples` relics; MIGRATION-entry naming parity) | ✓ |
+| 20 | allowlist / baseline / ratchet / ledger terminology | ✓ used consistently (P1=allowlist, P6=baseline, mechanism=ratchet, Data Model 5=Ledgers) |
+| 21 | TESTS / Harness Δ / Docs Δ item references | ✓ (S4/S5 Docs Δ carriers implicit only — SF-7) |
+| 22 | Identifier families KC 1–13, D-1–16, OQ-1–10, Q1–Q10, US/G/C, CONST-P1–P6 | all resolve ✓ except "Option B" (SF-4) and bare OQ3/OQ-3/OQ7 in header notes (SF-5) |
+| 23 | Registration accounting / loose liveness floor: KC 12 vs Data Model 6 vs Risks row vs TESTS item 4 | ✗ no owning slice — MF-2 |
+| 24 | Problem Statement verbatim PRD carry vs KC 6 / Retired subsection (pointerevent) | ✗ stale clause carried — SF-12 |
+
+## Findings
+
+### [must-fix]
+
+**MF-1. Slice-table Deps column vs DAG-shape line: two different edge sets (S4, S6).**
+- S6 cell (Slice series table, L145): Deps = "**S1–S5**" (en-dash range → S1,S2,S3,S4,S5). DAG-shape line (L147): "`S0 → {S1, S2, S3}`; `S2 → S4 → S5 → S6`; `S1, S3 → S6`" — explicit S6 deps are {S1, S3, S5}; S2/S4 reach S6 only transitively.
+- S4 cell (L143): Deps = "**S0, S2**". DAG line gives S4 only {S2} (S0 transitive via S2).
+- Why must-fix: review-round-1's disposition claimed "the DAG is single-sourced (slice-table deps = DAG-shape line)" — no longer literally true. A create-beads pass reading the table builds S6 with direct S2/S4 edges; one reading the DAG line does not: two different bead DAGs from one doc. Mitigating: transitive closures are identical (no scheduling or parallel-branch divergence) and a safe default exists (the DAG line's reduced form) — but the final round should not hand create-beads two answers.
+- Suggested fix (two cell edits): S4 Deps → `S2`; S6 Deps → `S5, S1, S3`. Alternative: one clause after the DAG line — "Deps column lists transitively-reduced direct edges; create-beads models the closure." Slices: S4, S6.
+
+**MF-2. The `>400` floor replacement (per-file registration accounting + loose liveness floor) is promised three times and owned by no slice.**
+- KC 12 (L313–316): "magic `>400` floor replaced by per-file registration accounting + loose liveness floor" — the "(per-slice)" header describes the shim-map ratchet cadence, not an owner for this one-time policy change.
+- Data Model 6 (L509–511): "registration accounting replaces the `>400` floor."
+- Risks row "Spec silent-drop" (L544): "Registration accounting + loose floor (data leg D5-c); per-slice ratchet."
+- TESTS item 4 lists "count-floor policy changes" as a Harness Δ item **type**, but no slice cell (S0–S6) carries one; S2/S4/S5 cells name only spec-conversion + jquery-site carriers.
+- Why must-fix: lens-3's "outcome clause with no owner slice." Create-beads must invent the owner (guess: S2 first harness Δ, or S0); different guesses produce different convoys, and the un-guessed case silently drops a promised spec-silent-drop mitigation.
+- Suggested fix: pin it. S2 cell Harness Δ clause += "count-floor policy: magic `>400` replaced by per-file registration accounting + loose liveness floor in this slice's harness commit"; mirror in TESTS item 4 ("S2 lands the policy change; S4/S5 extend the accounting per conversion"). (S0 alternative if the accounting must predate any conversion — but S0 is the pinched slice at 10–11.) Slices: S2 owner, S4/S5 extend.
+
+### [should-fix]
+
+**SF-1. "specs/ convention" (S0 cell, L139) is an undefined deliverable.** The term appears exactly once in the doc; `specs/` does not exist in the repo (verified). KC 10 / OQ-2 imply the safe default (`specs/bundle-budget.json`), but the convention's scope (bundle-budget only? bench baselines? check scripts?) is unwritten — an S0 REQ writer must invent it. Fix: one clause in the S0 cell, e.g. "specs/ convention: machine-checkable gate artifacts live under `specs/` (`bundle-budget.json` first; later gate JSONs follow)". Slice: S0.
+
+**SF-2. "test/dist/ purge" (S0 cell) unscoped.** `test/dist/` exists (verified: `build-fixtures.js`, `config.js`, `fixtures/`, `assets/`). The purge target is evident but scope isn't: delete outright vs regenerate-on-demand vs .gitignore. Fix: "test/dist/ checked-in build-fixture output deleted (+ .gitignore entry); fixtures regenerate on demand via test/dist/build-fixtures.js". Slice: S0.
+
+**SF-3. "scripts-considered parseHtml" (S2 cell, L141) vs "scripts-inert" (D-11, L527).** The slice cell's phrase reads against D-11's decision ("parseHtml is scripts-inert"); KC 3 correctly defers ("Script-execution decision below (Trade-offs D-11)"), and TESTS S2 pins a "parseHtml policy test" that must assert one behavior. D-11 (+ its S2 escape hatch, OQ-4) is authoritative; the cell wording is drift on a security-relevant semantic. Fix: S2 cell → "scripts-inert parseHtml (D-11; escape-hatch audit = first REQ of S2)". Slice: S2.
+
+**SF-4. "Option B" (S4 cell, L143) dangles.** No option labeling exists anywhere: D-4's rationale lists rejected alternatives unlabelled; KC 4 describes the engine without lettering. Legacy leg-report vocabulary leaking into the slice table. Fix: drop "(Option B)" or label D-4's alternatives once. Slice: S4.
+
+**SF-5. PRD-OQ vs design-OQ number collision in the header provenance notes.** prd-align-1 note: "pointerevent **OQ3** … retired" = PRD OQ3; prd-align-3 note: "**OQ-1/OQ-3** working positions labeled" = design OQ 1/3; the same note's "**OQ7** disposition made explicit" = PRD OQ7 (per round log OQ-F8), while the doc also has a design OQ-7 (inherit.self). Distinguished only by hyphen/context; the body itself is clean ("PRD OQ3"/"PRD G3" prefixed). Fix: prefix the bare note references ("PRD OQ3", "PRD OQ7"). Slices: none (header hygiene).
+
+**SF-6. env getter inventory drift: KC 1 vs env/ua surface.** KC 1 (L192–198) lists `platform/ios/android/browser/screenSize/svg` (memoized) + `width/height/landscape` (live); the env/ua surface (L432–434) adds a seventh getter ("`ua` raw string as diagnostic"). Fix: add the `ua` raw-string diagnostic getter to KC 1, or mark the surface section as the authoritative list. Slice: S1.
+
+**SF-7. S4/S5 outcome cells carry no Docs Δ carrier.** TESTS item 5 promises per-slice Docs Δ; S1/S2/S3/S6 cells carry them. S4's touched blocks (`__events`, `__events_type_dom`) have no .md (verified) — expected nil but unsaid; S5 rewrites `i-bem-dom`, which **does** have `i-bem-dom.{en,ru}.md` (verified) and plausibly needs an accuracy pass. Fix: S5 cell += "block docs ride the rewrite (i-bem-dom en/ru accuracy pass)"; S4 optionally += "no block docs @ anchor — Docs Δ expected nil". Slices: S4, S5.
+
+**SF-8. S1 ∥ S3 both edit the barrel + api-pin + deep-import inventory; no coordination note.** S1 adds env/ua exports + pin update "in the same commit"; S3 switches the loader export + pin to `bem:loader`. Both are parallel branches off S0. KC 8 itself cites "parallel hand-edits of the same two files would race" as the reason generation was pinned to S0 — the same hazard class is left unstated for the barrel/pin pair. Low severity (line-disjoint edits; rebase resolves), but the doc's own standard demands the note. Fix: one clause in the Implementation Plan Bead-DAG paragraph: "S1 and S3 mutate the barrel/pin inventory on disjoint export lines; merge order is free; rebase tolerance recorded in both specs." Slices: S1, S3.
+
+**SF-9. ua alias removal timing never stated.** KC 2 / D-13: "one-release Proxy" (S1); OQ-8: `env.browser` legacy keys "die with the ua alias". No clause states that the alias ships in 6.0.0 and its removal is the first post-6.0.0 release (outside this series) — a create-beads pass must infer that no slice of S0–S6 deletes it. Fix: KC 2 += "alias ships in 6.0.0; removal (with the `env.browser` legacy keys) is the first post-series release — owned by no slice of this series." Slices: none (boundary statement).
+
+**SF-10. Two-directional ratchet: mechanism home ambiguous.** KC 10 (L287–293): "the gate fails … when an allowlist/baseline entry's file no longer matches reality (ALLOW−JQ ≠ ∅ …)" — but which mechanism carries it? The constitution's CONST-P1 sdd-check stays `comm -23` additions-only (verified); KC 13 names S0 constitution amendments only for the CONST-P6 clause + CONST-P1 final predicate; CI wiring names CI riders (build job) without mapping them to the two-directional property. Fix: one clause in KC 10 or the CI-wiring S0 sentence: "the two-directional check rides the S0 CI riders (build job) + per-slice done-gate greps; the constitution sdd-check remains additions-only until its final S6 form." Slice: S0.
+
+**SF-11. D-16's consumer list is stale post-S0-generation.** D-16 (L532): "in-repo consumers verified = hand lists + spec harness only (switched mechanically at S3)" — the hand lists are deleted in S0 (KC 8); at S3 the entry consumers are the **generated** entries, which "flow through regeneration". The load-bearing claim (all consumers mechanical) survives; the noun is stale. Fix: D-16 → "generated platform entries + spec harness only (switched mechanically / regenerated at S3)". Slice: S3.
+
+**SF-12. Problem Statement's verbatim PRD carry includes a retired clause.** L126–127: "…`i-bem-dom` monolith … mixing: live-range DOM collection management, **pointerevent normalization**, event delegation…" — KC 6 and the Retired subsection grep-verified zero pointer code @ f2ab61e and retired the PRD Problem Statement item. The body both asserts and refutes the same fact. (Same family, weaker: "an undecided classical-OOP `inherit`" was true at PRD time and is resolved by Q4/D-2 — process state, tolerable.) Fix: parenthetical in the Problem Statement: "pointerevent normalization (item retired — zero pointer code @ f2ab61e; see KC 6)". Slices: none.
+
+**SF-13. "tag `v5-base`@7a9e932" (S0 cell): create-vs-verify ambiguity.** Q1 says the tag exists on origin at 7a9e932 **and** "Creation of the annotated tag + public API inventory lives in slice-0" — the S0 outcome clause inherits the tension. Fix: S0 cell → "verify tag `v5-base` = 7a9e932 on origin (create the annotated tag only if absent — Q1)". Slice: S0.
+
+### Lens verdicts (explicit no-finding statements)
+
+- **Lens 1 (contradictions), beyond the matrix:** REQ estimates, CONST-P1/P6 arithmetic, staging keying, merge-fallback and overflow-split language, harness carriers, bench set, loader path, exports paths, and header-vs-body cut propagation were re-read pairwise; the only DAG-diverging pair is MF-1 and the only gate-semantics drift is SF-3 (safe default: D-11 is authoritative).
+- **Lens 2 (naming drift):** every family in the brief was walked — bemDom casing intentional (D-7); `i-bem-js` intentional (docs dir); artifact path families consistent; module specifiers consistent; `touch-emulated` consistent; `test:browser`/`test-browser` both real (script vs CI job); allowlist/baseline/ratchet/ledger consistent; TESTS/Harness Δ/Docs Δ consistent; identifiers resolve except SF-4/SF-5.
+- **Lens 3 (missing glue):** every cross-slice handoff named in the brief was traced — S2 facade → S4/S5 consumers ✓ (S5 cell names it); S0 generation → S2/S3 deletions ✓ (KC 8 rationale); S1 barrel additions → S3 barrel switch ✓ (both cells, disjoint lines); S5 registry → S6 deletions ✓; every gate named in a section appears in its slice's done-gate enumeration ✓ (generic done-gate line + per-slice greps + KC 11). Gaps found: MF-2, SF-1/2/7/8/9/10.
+- **Lens 4 (final completeness):** read end-to-end as create-beads would — 7 convoy specs are writable without inventing a single requirement, gate, or dependency once MF-1/MF-2 are applied; the residual invention list is SF-1/2/4/9/13. Header notes vs body: every claimed fix found in the body; every cut propagated; no body text contradicts a cut/dropped/retired note (the pointerevent item is a PRD-verbatim carry, SF-12, not a header note). Markdown structure: slice-table rows intact; the S6 row (the doc's longest cell) is complete in the file — the "truncation" is a display artifact only; full raw text re-read and every clause in it (deletion list, final caps, UMD drop, `bemEntityToModuleName`, CONST-P6 ∅ + dependents, docs deletions, README section, API-accuracy pass, MIGRATION/CHANGELOG consolidation, LICENSE/notices) is defined elsewhere in the doc.
+
+## Confidence
+
+High. Every finding is anchored to a section + line and re-verified against the current file text; load-bearing repo facts were re-verified read-only (package.json scripts incl. `test:browser`; ci.yml jobs incl. `test-browser`; test/dist contents; specs/ absence; block-doc inventory beside i-bem-dom/idle/loader vs `__events*` having none; build/platforms hand lists present; common.docs/i-bem-js present; events/__observable present). MF-1's severity is the one judgment call: the differing edge sets have identical transitive closures, so scheduling cannot diverge — graded must-fix because the doc's own single-sourcing claim is what create-beads relies on and the fix is two trivial cell edits. MF-2 is unambiguous (three promises, zero owners). All should-fixes are friction-class with stated safe defaults.
