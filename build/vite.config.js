@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
 
         build: {
             lib: {
-                entry: resolve(import.meta.dirname, 'platforms', `${platform}.js`),
+                entry: resolve(import.meta.dirname, 'platforms', `${platform}.gen.js`),
                 name: 'bemCore',
                 formats: ['es', 'umd'],
                 fileName: (format) => `bem-core.${format === 'es' ? 'mjs' : 'js'}`,

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import {
     scanLevel,
@@ -359,6 +360,76 @@ describe('buildRegistry', function() {
         const missing = expectedModules.filter(m => !reg.modules.has(m));
         assert.deepStrictEqual(missing, [],
             `Missing modules: ${missing.join(', ')}`);
+    });
+});
+
+// --- transformer-form hard error (KC 9) ---
+
+describe('transformer-form validation', function() {
+    it('live repo: all redefinition chains pass validation (desktop)', function() {
+        const reg = buildRegistry(['common.blocks', 'desktop.blocks'], ROOT);
+        assert.ok(reg.redefinitions.size > 0, 'jquery__config chain must exist');
+    });
+
+    it('live repo: all redefinition chains pass validation (touch)', function() {
+        const reg = buildRegistry(['common.blocks', 'touch.blocks'], ROOT);
+        assert.ok(reg.modules.has('ua__dom'));
+    });
+
+    it('buildRegistry errors on a non-transformer redefinition, naming both files', function() {
+        const fixtureRoot = mkdtempSync(resolve(tmpdir(), 'bem-transformer-red-'));
+        try {
+            mkdirSync(resolve(fixtureRoot, 'common.blocks', 'foo'), { recursive: true });
+            mkdirSync(resolve(fixtureRoot, 'desktop.blocks', 'foo'), { recursive: true });
+            writeFileSync(resolve(fixtureRoot, 'common.blocks', 'foo', 'foo.js'),
+                'export default { base: true };\n');
+            writeFileSync(resolve(fixtureRoot, 'desktop.blocks', 'foo', 'foo.js'),
+                'export default { override: true };\n');
+            assert.throws(
+                () => buildRegistry(['common.blocks', 'desktop.blocks'], fixtureRoot),
+                (error) => {
+                    assert.match(error.message, /not transformer-form/);
+                    assert.match(error.message, /desktop\.blocks\/foo\/foo\.js/);
+                    assert.match(error.message, /common\.blocks\/foo\/foo\.js/);
+                    return true;
+                }
+            );
+        } finally {
+            rmSync(fixtureRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('buildRegistry accepts transformer-form redefinitions', function() {
+        const fixtureRoot = mkdtempSync(resolve(tmpdir(), 'bem-transformer-ok-'));
+        try {
+            mkdirSync(resolve(fixtureRoot, 'common.blocks', 'foo'), { recursive: true });
+            mkdirSync(resolve(fixtureRoot, 'desktop.blocks', 'foo'), { recursive: true });
+            writeFileSync(resolve(fixtureRoot, 'common.blocks', 'foo', 'foo.js'),
+                'export default { base: true };\n');
+            writeFileSync(resolve(fixtureRoot, 'desktop.blocks', 'foo', 'foo.js'),
+                'export default function(base) { base.override = true; return base; };\n');
+            const reg = buildRegistry(['common.blocks', 'desktop.blocks'], fixtureRoot);
+            assert.ok(reg.redefinitions.has('foo'));
+            assert.strictEqual(reg.redefinitions.get('foo')[1].isRedefinition, true);
+        } finally {
+            rmSync(fixtureRoot, { recursive: true, force: true });
+        }
+    });
+
+    it('generateBarrel errors on an entry flagged non-transformer, naming both files', function() {
+        const entries = [
+            { filePath: '/root/common.blocks/foo/foo.js', isRedefinition: false },
+            { filePath: '/root/desktop.blocks/foo/foo.js', isRedefinition: false },
+        ];
+        assert.throws(
+            () => generateBarrel('foo', entries, '/root'),
+            (error) => {
+                assert.match(error.message, /not transformer-form/);
+                assert.match(error.message, /desktop\.blocks\/foo\/foo\.js/);
+                assert.match(error.message, /common\.blocks\/foo\/foo\.js/);
+                return true;
+            }
+        );
     });
 });
 

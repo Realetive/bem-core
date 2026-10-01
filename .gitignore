@@ -28,3 +28,7 @@ coverage.json
 /*.sets
 
 _book
+
+# S0: checked-in build-fixture output purged; regenerates via test/dist/build-fixtures.js
+/test/dist/fixtures/
+/test/dist/assets/

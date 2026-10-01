@@ -1,0 +1,7 @@
+# MPL-2.0 notices baseline (CONST-P5, recorded at S0).
+# Verified @ f2ab61e: the list of JS source files carrying file-level MPL
+# notices is EMPTY — no file under common.blocks/, desktop.blocks/,
+# touch.blocks/, build/ or test/ contains an MPL notice header; LICENSE.txt
+# is the sole license artifact. Lines starting with '#' and blank lines are
+# ignored by consumers. S6 asserts every surviving file in this list still
+# carries its notice (grep -L MPL over the list = empty) plus LICENSE.txt.

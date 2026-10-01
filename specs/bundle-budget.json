@@ -1,0 +1,18 @@
+{
+  "comment": "Bundle-budget gate caps (design doc KC 10 / OQ-2: caps live here + CI, not the constitution). Caps = measured gz bytes @ S0 + 10% headroom; grow only with explicit amendment (ratchet semantics, binding from S0). Final caps are amended in S6's own commit (~13 kB gz desktop / ~14 touch).",
+  "measure": "gzipSync (node:zlib, default level) byte length of the built artifact",
+  "artifacts": {
+    "dist/desktop/bem-core.mjs": {
+      "gzipCapBytes": 12055,
+      "measuredGzipBytes": 10959
+    },
+    "dist/touch/bem-core.mjs": {
+      "gzipCapBytes": 12831,
+      "measuredGzipBytes": 11664
+    },
+    "dist/index.mjs": {
+      "gzipCapBytes": 10536,
+      "measuredGzipBytes": 9578
+    }
+  }
+}

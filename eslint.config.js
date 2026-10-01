@@ -9,6 +9,9 @@ export default [
             'node_modules/',
             'libs/',
             'test/',
+            // local agent/tooling droppings (gas town rig) — never in CI
+            '.gc/',
+            '.opencode/',
             'common.blocks/inherit/',
             '**/*.spec.js',
             '**/*.tests/**',

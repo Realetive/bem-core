@@ -54,6 +54,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # S0 verification fence (spec bc-gdk9 / bc-ysp7):
+      # bundle gate (gz caps + allowlist/baseline ratchets, staged final
+      # assertions), platform-entry freshness diff, CONST-P6 baseline check,
+      # CONST-P1 bidirectional ratchet + final predicate (skip/preview),
+      # doc-parity fence.
+      - run: node build/check-bundle-size.mjs
+      - run: node build/generate-platform-entries.mjs && git diff --exit-code -- build/platforms/
+      - run: bash specs/check-platform-baseline.sh
+      - run: bash specs/check-jquery-ratchet.sh
+      - run: node build/check-doc-parity.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: dist

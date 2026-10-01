@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- **Public API surface (S0)**: the package root export `.` is now the platform-neutral named-export barrel (`dist/index.mjs`: `bemDom`, `BemDomCollection`, `dom`, `Emitter`, `Event`, `channels`) instead of the side-effect desktop payload — payload consumers migrate to `bem-core/dist/desktop` / `bem-core/dist/touch` (see MIGRATION → "S0 Verification fence + public contracts").
+- **Exports map narrowed (S0)**: the `"./*"` wildcard is replaced by `"./common.blocks/*"` + enumerated entries; non-public deep imports now fail with `ERR_PACKAGE_PATH_NOT_EXPORTED` / unresolved Vite imports.
+- **Repository metadata**: `repository.url` now points at the fork (`Realetive/bem-core`).
+
+### Features
+
+- Platform entry modules are generated from the vite-plugin-bem-levels scan registry (`build/platforms/*.gen.js`, committed; CI freshness diff) — the hand-maintained lists are gone.
+- Verification fence landed: bundle-budget gate (`specs/bundle-budget.json` + `build/check-bundle-size.mjs`), CONST-P6 platform-baseline check, bidirectional CONST-P1 jquery ratchet with the final zero-jquery predicate (staged, binding at S6), doc-parity fence for MIGRATION/CHANGELOG en↔ru pairs, api-pin test for the deep-import inventory.
+- `vite-plugin-bem-levels` now hard-errors when a redefinition-chain entry (index ≥ 1) is not transformer-form `export default function(prev)`.
+
+
 ## 5.0.0
 
 ### Breaking changes

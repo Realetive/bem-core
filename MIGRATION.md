@@ -1565,3 +1565,21 @@ provide(BEMDOM);
 
 });
 ```
+
+## Unreleased
+
+### S0 Verification fence + public contracts
+
+**Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
+
+```js
+// before (side-effect payload consumers)
+import 'bem-core';
+// after
+import 'bem-core/dist/desktop'; // or 'bem-core/dist/touch'
+
+// new named-export API
+import { bemDom, BemDomCollection, dom, Emitter, Event, channels } from 'bem-core';
+```
+
+**Exports map narrowed.** The wildcard `"./*": "./*"` (every root-relative path was importable, including `desktop.blocks/…`, `touch.blocks/…`, `test/…`) is replaced by `"./common.blocks/*"` plus the enumerated entries (`./dist/desktop`, `./dist/touch`, `./build/plugins/*`). Deep imports outside the exported set now fail with `ERR_PACKAGE_PATH_NOT_EXPORTED` (Node) or an unresolved import (Vite, build time).
