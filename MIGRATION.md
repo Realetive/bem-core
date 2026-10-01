@@ -1583,3 +1583,31 @@ import { bemDom, BemDomCollection, dom, Emitter, Event, channels } from 'bem-cor
 ```
 
 **Exports map narrowed.** The wildcard `"./*": "./*"` (every root-relative path was importable, including `desktop.blocks/…`, `touch.blocks/…`, `test/…`) is replaced by `"./common.blocks/*"` plus the enumerated entries (`./dist/desktop`, `./dist/touch`, `./build/plugins/*`). Deep imports outside the exported set now fail with `ERR_PACKAGE_PATH_NOT_EXPORTED` (Node) or an unresolved import (Vite, build time).
+
+### S3 Loader: import()-based root module; mod paths deleted
+
+**`bem:loader` is now the canonical root module.** The two `_type` modifier modules are deleted outright — there is **no one-release bridge** (D-16). Old and new paths:
+
+| Before (deleted) | After |
+| --- | --- |
+| `common.blocks/loader/_type/loader_type_js.js` (`bem:loader_type_js`) | `common.blocks/loader/loader.js` (`bem:loader`) |
+| `common.blocks/loader/_type/loader_type_bundle.js` (`bem:loader_type_bundle`) | — (deleted; the ym bundle format is dead, Q7) |
+
+The callable shape is preserved and the promise return is additive:
+
+```js
+// before
+import loader from 'bem:loader_type_js';
+loader(url, success, error); // classic script injection, no return value
+
+// after
+import loader from 'bem:loader';
+loader(url, success, error); // dynamic import() + callback shim
+const module = await loader(url); // resolves to the module namespace
+```
+
+**ES modules only.** The URL must be a valid ES module served with a JavaScript MIME type. Classic scripts that only define globals no longer load; a non-module URL rejects.
+
+**Cross-origin loads now require CORS.** Dynamic `import()` enforces CORS on the target (`Access-Control-Allow-Origin`); the old script-injection loader did not. A repo-wide audit found zero absolute-URL loader call sites (see `specs/bc-ilml.md` for the audit result and the semantics table); cross-origin consumers must ensure their target sends CORS headers.
+
+Other semantic shifts, recorded in `specs/bc-ilml.md`: the in-flight dedup / loaded-once cache is now the browser's native module map; the `file:`-protocol prefix fix is gone (Vite/Node resolve natively); no load timeout exists (none existed in `loader_type_js` either — the PRD's timeout requirement was stale).

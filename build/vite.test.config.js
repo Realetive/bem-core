@@ -29,6 +29,16 @@ export default defineConfig({
     server: {
         port: 5174,
         open: false,
+        // Dual-stack loopback: the loader CORS spec loads the same fixture
+        // through the other loopback literal (localhost <-> 127.0.0.1),
+        // which is a different origin that the dev server must reject —
+        // needs both families bound to reject for CORS rather than for an
+        // unreachable target.
+        host: '::',
+        // No CORS headers: the dev server would otherwise reflect loopback
+        // origins, and the loader's cross-origin rejection spec could never
+        // fire. Same-origin page operation is unaffected.
+        cors: false,
     },
 
     // Polyfill Node.js globals used by mocha's browser-entry.js

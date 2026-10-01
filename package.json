@@ -43,7 +43,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "node --test build/plugins/vite-plugin-bem-levels.test.js common.blocks/i18n/i18n.test.js test/api-pin.test.js test/platform-entries.test.js test/gate-fixtures.test.js test/spike-dynamic-import.test.js",
+    "test": "node --test build/plugins/vite-plugin-bem-levels.test.js common.blocks/i18n/i18n.test.js test/api-pin.test.js test/platform-entries.test.js test/gate-fixtures.test.js test/spike-dynamic-import.test.js test/loader-closure.test.js",
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
     "test:all": "npm test && npm run test:browser",

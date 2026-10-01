@@ -192,7 +192,7 @@ function parseEsModule(source, filePath, levelDir) {
  * common.blocks/objects/objects.vanilla.js → 'objects'
  * common.blocks/i-bem/__internal/i-bem__internal.vanilla.js → 'i-bem__internal'
  * common.blocks/functions/__debounce/functions__debounce.vanilla.js → 'functions__debounce'
- * common.blocks/loader/_type/loader_type_js.js → 'loader_type_js'
+ * common.blocks/loader/loader.js → 'loader'
  */
 function filePathToModuleName(filePath, levelDir) {
     const rel = relative(levelDir, filePath)

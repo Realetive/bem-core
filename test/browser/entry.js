@@ -47,7 +47,7 @@ import cookie from 'bem:cookie';
 import tick from 'bem:tick';
 import uri from 'bem:uri';
 import uriQuerystring from 'bem:uri__querystring';
-import loaderTypeJs from 'bem:loader_type_js';
+import loader from 'bem:loader';
 
 import bemInternal from 'bem:i-bem__internal';
 import bem from 'bem:i-bem';
@@ -87,7 +87,7 @@ window.modules = createModulesShim({
     tick,
     uri,
     'uri__querystring': uriQuerystring,
-    'loader_type_js': loaderTypeJs,
+    'loader': loader,
     'i-bem__internal': bemInternal,
     'i-bem': bem,
     'i-bem__collection': bemCollection,

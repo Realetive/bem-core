@@ -4,12 +4,14 @@
 
 ### Breaking changes
 
+- **Loader is import()-based (S3)**: `loader` is now a single canonical root module (`bem:loader`, `common.blocks/loader/loader.js`) implemented as a thin shim over dynamic `import()` — the `_type` mod paths are deleted outright with no one-release bridge, `loader_type_bundle` is gone with the dead ym bundle format. URLs must be ES modules (JavaScript MIME) and cross-origin targets must send CORS headers; the returned promise resolves to the module namespace (see MIGRATION → "S3 Loader: import()-based root module; mod paths deleted" and `specs/bc-ilml.md`).
 - **Public API surface (S0)**: the package root export `.` is now the platform-neutral named-export barrel (`dist/index.mjs`: `bemDom`, `BemDomCollection`, `dom`, `Emitter`, `Event`, `channels`) instead of the side-effect desktop payload — payload consumers migrate to `bem-core/dist/desktop` / `bem-core/dist/touch` (see MIGRATION → "S0 Verification fence + public contracts").
 - **Exports map narrowed (S0)**: the `"./*"` wildcard is replaced by `"./common.blocks/*"` + enumerated entries; non-public deep imports now fail with `ERR_PACKAGE_PATH_NOT_EXPORTED` / unresolved Vite imports.
 - **Repository metadata**: `repository.url` now points at the fork (`Realetive/bem-core`).
 
 ### Features
 
+- Loader spec corpus runs against servable ES-module URL fixtures (`test/browser/fixtures/loader/`), and `test/loader-closure.test.js` mechanically pins the loader-path deletion and the zero-absolute-URL CORS audit.
 - Platform entry modules are generated from the vite-plugin-bem-levels scan registry (`build/platforms/*.gen.js`, committed; CI freshness diff) — the hand-maintained lists are gone.
 - Verification fence landed: bundle-budget gate (`specs/bundle-budget.json` + `build/check-bundle-size.mjs`), CONST-P6 platform-baseline check, bidirectional CONST-P1 jquery ratchet with the final zero-jquery predicate (staged, binding at S6), doc-parity fence for MIGRATION/CHANGELOG en↔ru pairs, api-pin test for the deep-import inventory.
 - `vite-plugin-bem-levels` now hard-errors when a redefinition-chain entry (index ≥ 1) is not transformer-form `export default function(prev)`.

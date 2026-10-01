@@ -8,8 +8,8 @@
  *  - `env` is an S1 artifact: not part of the pinned set until S1 lands.
  *  - `ua` JS is platform-only (desktop.blocks/touch.blocks): never pinned.
  *  - `loader` root module (`common.blocks/loader/loader.js`) is the S3
- *    canonical form — today only the `_type` mods exist, so the pin holds the
- *    `loader_type_js` mod path; S3's commit flips it to the root module.
+ *    canonical form — the pin flipped from the deleted `_type` mod path to
+ *    the root module in S3's own commit (bc-ilml).
  *  - `inherit` is internal-but-tolerated under the `./common.blocks/*`
  *    wildcard (frozen internal per Q4/D-2): NOT part of the public contract;
  *    a future narrowing that removes it needs a CONST-P4 migration note.
@@ -49,8 +49,8 @@ const PINNED_PUBLIC_DEEP_IMPORTS = [
     'bem-core/common.blocks/events/__observable/_type/events__observable_type_bem-dom.js',
     // dom
     'bem-core/common.blocks/dom/dom.js',
-    // loader (today's form; S3 flips to the root module)
-    'bem-core/common.blocks/loader/_type/loader_type_js.js',
+    // loader (S3 canonical root-module form)
+    'bem-core/common.blocks/loader/loader.js',
 ];
 
 const ENUMERATED_EXPORTS = [
@@ -124,11 +124,13 @@ describe('api-pin: supported deep-import inventory', function() {
         assert.strictEqual(pkg.exports['./dist/touch'], './dist/touch/bem-core.mjs');
     });
 
-    it('barrel v1 exports exactly the six plain DOM-flavor names (D-7)', function() {
+    it('barrel exports the six plain DOM-flavor names (D-7) + loader (S3)', function() {
         const barrel = readFileSync(resolve(ROOT, 'build/barrel.js'), 'utf8');
         for (const name of ['bemDom', 'BemDomCollection', 'dom', 'Emitter', 'Event', 'channels']) {
             assert.ok(barrel.includes(name), `barrel must export ${name}`);
         }
+        assert.ok(barrel.includes("export { default as loader } from 'bem:loader';"),
+            'S3 switched the barrel to the bem:loader root module');
         assert.ok(!barrel.includes('entities'),
             'bem.entities is internal (OQ-7) — never a barrel export');
     });

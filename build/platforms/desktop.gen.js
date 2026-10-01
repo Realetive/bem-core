@@ -5,7 +5,7 @@
 // Imports are in canonical sorted order; cross-module ordering rides
 // static bem: import edges, not list order.
 
-// desktop: 37 modules
+// desktop: 36 modules
 
 import 'bem:cookie';
 import 'bem:dom';
@@ -34,8 +34,7 @@ import 'bem:jquery';
 import 'bem:jquery__config';
 import 'bem:jquery__event_type_winresize';
 import 'bem:keyboard__codes';
-import 'bem:loader_type_bundle';
-import 'bem:loader_type_js';
+import 'bem:loader';
 import 'bem:next-tick';
 import 'bem:objects';
 import 'bem:strings__escape';

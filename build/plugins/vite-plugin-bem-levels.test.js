@@ -40,10 +40,10 @@ describe('parseModulesDefine', function() {
 
     it('parses define with double quotes', function() {
         const result = parseModulesDefine(
-            'modules.define("jquery", ["loader_type_js"], function(provide, loader) {});'
+            'modules.define("jquery", ["next-tick"], function(provide, nextTick) {});'
         );
         assert.strictEqual(result.name, 'jquery');
-        assert.deepStrictEqual(result.deps, ['loader_type_js']);
+        assert.deepStrictEqual(result.deps, ['next-tick']);
         assert.strictEqual(result.isRedefinition, false);
     });
 
@@ -347,7 +347,7 @@ describe('buildRegistry', function() {
             'events__channels',
             // common.blocks .js
             'cookie', 'dom', 'jquery', 'idle', 'idle_start_auto',
-            'keyboard__codes', 'loader_type_js', 'loader_type_bundle',
+            'keyboard__codes', 'loader',
             'events__observable', 'events__observable_type_bem-dom',
             'i-bem__collection', 'i-bem-dom', 'i-bem-dom__collection',
             'i-bem-dom__init', 'i-bem-dom__init_auto',
@@ -499,8 +499,8 @@ describe('expandBemEntity', function() {
     });
 
     it('expands block-level mods', function() {
-        const result = expandBemEntity({ block: 'loader', mods: { type: 'js' } });
-        assert.deepStrictEqual(result, ['loader_type_js']);
+        const result = expandBemEntity({ block: 'tick', mods: { start: 'auto' } });
+        assert.deepStrictEqual(result, ['tick_start_auto']);
     });
 
     it('expands elems with nested mods', function() {
