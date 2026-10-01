@@ -1,0 +1,231 @@
+# PRD-align-2 · non-goals-enforcement (arch-overhaul)
+
+Leg: non-goals-enforcement (review_id=arch-overhaul, review_phase=prd-align-2).
+Repo evidence @ f2ab61e, read-only; claims marked ✓ verified directly against the
+repo (paths cited). Q1–Q10 answers treated as binding amendments.
+
+## Summary
+
+- **0 [must-cut], 6 [guardrail], 1 [should-cut].** No design element is
+  unauthorized new scope on its face: the new public surface is grounded in
+  Q3/Q5/G3, the CI/build additions are slice-driven, and the frozen-block list
+  is respected.
+- **NG2 (no new public API)** holds: every new public name (barrel exports,
+  `env`, `ua` alias, `orientchange`, `./build/plugins/*`, loader promise
+  return) traces to Q3/Q5 or G3; `./build/plugins/*` is *already* public in
+  today's package.json exports ✓. One completeness gap in the env surface
+  (`bada`/`wp` read by `ua__dom` but undispositioned) → F6.
+- **NG4 (no CI/bundler changes beyond slices)** has one genuine overrun: the
+  Node matrix realignment [20,22]→[20,24] is required by no slice → F7.
+- **NG1 (no templating redesign)** holds in substance: CONST-P6 treats
+  bemhtml/bh files as placement-checked only; `page__icon` hoist is a pure
+  move; the `page__conditional-comment` **deletion** rides the edge and needs
+  an explicit authorization record → F5.
+- **NG6 (frozen blocks)** holds: `idle` jquery removal is authorized by the
+  non-goal itself; keyboard is untouched — but OQ6's test provision lives only
+  in the hand-maintained platform entries that D-8 deletes → F4.
+- **NG3 (TS), NG5 (upstream), NG7 (vision-only)**: clean, no findings.
+- Out-of-leg doc defects noticed during the sweep (non-blocking, coordinator's
+  discretion): Data Model 5 still says "CONST-P6 baseline (3→∅)" (stale —
+  verified baseline is 7 groups/12 files everywhere else); the Risks row cites
+  "16 v4-era BEMDOM.* matches" (actual: 43 ✓).
+
+## Non-goals matrix
+
+### NG1 — no templating-story redesign beyond loader/ESM forces
+
+| Design element | Verdict / authorization |
+|---|---|
+| KC13 CONST-P6 scope "JS, `.deps.js`, bemhtml/bh templates, CSS" | KEEP-JUSTIFIED (G6/CONST-P3: ancestor-existence placement check only; no template semantics touched) |
+| Slice table S6 "`page__icon` hoisted to common" | KEEP-JUSTIFIED (pure file move forced by CONST-P6 ∅; zero behavior change) |
+| Slice table S6 / KC13 "`page__conditional-comment` deleted (IE relic)" | [guardrail F5] — template-surface *removal*; defensible via C5 + CONST-P6 but must be recorded as authorized removal |
+| Data Model 1 + D-9 `.deps.js` schema + resolution lint | KEEP-JUSTIFIED (D-9 already bounds it: documented manifest, never a build input; preserves the manifest's documentary value through the ESM transition) |
+| Data Model 1 "entity-converters unified (dead `bemEntityToModuleName` removed)" | KEEP-JUSTIFIED (repo-verified dead ✓: defined/exported at build/plugins/vite-plugin-bem-levels.js:280/:669, zero internal call sites; build-tooling cleanup, not templating) |
+
+### NG2 — no new features, blocks, or public API additions
+
+| Design element | Verdict / authorization |
+|---|---|
+| Root barrel names (`bemDom`, `BemDomCollection`, `dom`, `Emitter`/`Event`, `channels`, `loader`, `env`, `ua`) | KEEP-JUSTIFIED (Q3 public-blocks inventory; all re-exports of existing public modules; "No invented/prefixed exports" stated in Interface) |
+| `env` public module + getters (KC1) | KEEP-JUSTIFIED (Q5 explicit exception: "env IS a new public module", scoped to audited consumer inventory) |
+| env surface completeness vs `ua__dom` reads | [guardrail F6] — `ua__dom` also reads `ua.bada`/`ua.wp` ✓; the env surface never dispositions them |
+| `ua` deprecated Proxy alias, one release (KC2/D-13) | KEEP-JUSTIFIED (Q5: "Keep `ua` as a deprecated alias for one release") |
+| `orientchange` CustomEvent surface | KEEP-JUSTIFIED (parity with the audited consumer ✓: today touch ua jQuery-triggers `orientchange` `{landscape,width,height}` on resize and `ua__dom` listens via `_domEvents(bemDom.win)`; env re-expresses the same event natively) |
+| `./build/plugins/*` exposure | KEEP-JUSTIFIED (Q3; already present in today's package.json exports ✓ — not even an addition) |
+| `loader()` promise return (KC7) | KEEP-JUSTIFIED (G3: import()-native shape, additive — current default export is `(path, success, error)` with callbacks preserved ✓; pinned by S3 TESTS "promise-return semantics") |
+| Bench project B1–B6 (new scenarios) | KEEP-JUSTIFIED (Q6 harness mandate + C3/D-10 as S4/S5 done-gates; test infra, not a feature; CI scheduling deferred to OQ1) |
+| CONST-P6 check itself | KEEP-JUSTIFIED (G6 enforcement tooling; no product surface) |
+| Plugin transformer-form validation errors (KC9) | KEEP (build-time dev-tooling error naming both files; not runtime API) |
+| `bem.entities` "internal, pinned" (DM3, OQ7) | KEEP (explicit containment, not growth) |
+| `bemDom.scope/doc/win` explicit throw when body absent | KEEP-JUSTIFIED as C4 documented break (Q3 DOM type contract); MIGRATION entry required in the owning slice |
+
+### NG3 — no TypeScript rewrite
+
+No types/d.ts/TS scope anywhere in the doc; tree-shaking/TS/types appears only
+as a *rejected* scope-creep risk. Clean, no findings.
+
+### NG4 — no bundler/CI changes beyond what architectural slices require
+
+| Design element | Verdict / authorization |
+|---|---|
+| S0 bundle gate appended to `build` job | KEEP-JUSTIFIED (US1/G1 measurement + C3; staged per KC10 so per-slice binding stays green) |
+| S0 api-pin test joins `test` suite | KEEP-JUSTIFIED (CONST-P4/Q3 mechanical enforcement) |
+| S0 "Node matrix aligned to the picked floor ([20,24])" | [should-cut F7] — current matrix [20,22] ✓ already pins the ≥20 floor (engines ">=20" ✓); no slice needs 24 |
+| S1 touch-emulated Playwright project | KEEP-JUSTIFIED (Q8 explicit: slice-1 acceptance) |
+| S2 bench Playwright project | KEEP-JUSTIFIED (done-gate for S4/S5 per C3; scheduling = OQ1) |
+| S6 UMD format drop (D-14) | KEEP-JUSTIFIED (repo-verified ✓: build/vite.config.js emits formats ['es','umd'] with `external:['jquery']` + `globals.jquery:'jQuery'` — the UMD artifact structurally depends on the wrapper; drop is forced by S6/Q2) |
+| `vite-plugin-bem-levels` public-export path | KEEP-JUSTIFIED (Q3; exports-map entry only, no bundler behavior change) |
+| Doc-parity fence (S0, KC13) | KEEP-JUSTIFIED (C3/G7 bilingual MIGRATION ledger discipline; minimal anchor-count check) |
+| Init registry / generated platform entries (KC8, D-8) | KEEP-JUSTIFIED (ESM entry architecture for S0/S1; replaces the hand lists that exist today ✓ build/platforms/{desktop,touch}.js) |
+
+### NG5 — no upstream re-sync
+
+No implied upstream work anywhere; CONST-P5/MPL-2.0 notices preserved (KC13,
+S6 done-gate notices-intact grep); `repository.url` fix is fork hygiene
+authorized by Q9. Clean.
+
+### NG6 — frozen blocks (`i18n`, `uri`, `strings`, `functions`, `objects`,
+`next-tick`, `tick`, `identify`, `keyboard`, `cookie`, `idle`)
+
+| Design element | Verdict / authorization |
+|---|---|
+| S2 `idle` off jquery | KEEP-JUSTIFIED (authorized verbatim by this non-goal: "beyond removing their jquery dependency (idle)") |
+| S2 `dom` native | KEEP (`dom` is NOT on the frozen list; it is a CONST-P1 consumer migrated per G1) |
+| keyboard (OQ6 test provision) | [guardrail F4] — no keyboard work is scheduled, but the provision's only carrier today is the hand-written platform-entry imports ✓ (build/platforms/desktop.js:53, touch.js:52) that D-8 replaces with generation |
+| Spec-harness shim-map ratchet + `>400`-floor replacement (KC12, DM6) | KEEP-JUSTIFIED (harness-only; specs convert "as slices touch them"; frozen blocks' specs and internals stay untouched) |
+| `_buildModValRE` memoization, `domNodesToParents` deletion, WeakMap migration (KC6) | KEEP-JUSTIFIED (all inside `i-bem-dom` — the G5 rework target, not the frozen list) |
+| `i18n`, `uri`, `strings`, `functions`, `objects`, `next-tick`, `tick`, `identify`, `cookie` | Zero mentions as change targets. Clean |
+
+### NG7 — no implementation code in this convoy
+
+Doc is design + slice plan + bead DAG; every code block is a target-state
+contract; all work items are assigned to future slice convoys (S0–S6) with
+spec-craft done-gates. Clean.
+
+### Spirit sweep (Problem Statement / Rough Approach bounds)
+
+| Design element | Verdict |
+|---|---|
+| S6 README/README.ru rewrite + common.docs guide rewrite | [guardrail F1] — unbounded as written; evidence figure stale |
+| "zero window.* writes as the stated end state" (D-14) | [guardrail F2] — consequence vs new enforced invariant ambiguity |
+| WeakRef/FinalizationRegistry | KEEP (D-5 *rejects* both; sole mention, nothing introduces them) |
+| Emulation-parity testing scope | KEEP-JUSTIFIED (Q8-bounded: minimal touch-emulated project, S1 acceptance) |
+| Bench "absolute budgets deferred until dedicated-runner evidence" | [guardrail F3] — reads as scheduled-but-unfunded future work |
+| US1 tree-shaking | KEEP (Design position 5 scopes US1 to "no jQuery in bundle") |
+
+## Findings
+
+### [guardrail] F1 — S6 docs rewrite unbounded; evidence figure stale
+
+- Section: Risks row "v4-era `common.docs/i-bem-js/` guide rot (16 v4-era
+  `BEMDOM.*` matches) … Docs rewrite scoped in S6 as v4→v6 guide rewrite (ux
+  leg K2), not a jQuery-swap"; Slice table S6 "README/README.ru rewrite".
+- Traces to: NG-2/NG-4 in spirit (a full v4→v6 guide rewrite is a docs
+  project, not an architectural-slice requirement).
+- Evidence: 43 `BEMDOM.*` matches under common.docs/i-bem-js ✓ (en guides
+  only; ru counterparts have 0 — the bilingual pair is already divergent).
+- Proposed edit: bound the S6 scope to an API-accuracy pass — "BEMDOM.* →
+  bemDom.* remap; sections for deleted APIs (loader semantics, ua fields,
+  `$(node).bem()`, UMD) point at MIGRATION entries; ru/en anchor parity via
+  the doc fence; content redesign out of scope, deferred post-6.0.0" — and
+  fix "16" → 43 (or recount at S6 spec-craft).
+
+### [guardrail] F2 — "zero window.* writes as the stated end state" reads as a new invariant
+
+- Section: Trade-offs D-14 "… zero window.* writes as the stated end state".
+- Traces to: NG-4 (if enforced, a new CI check no slice requires) / NG-2
+  spirit (a new product invariant the PRD never states).
+- Proposed edit: append "(descriptive consequence of the UMD drop — no new
+  check is scheduled by this plan; S6's grep predicates remain: no-jquery-
+  in-artifact, CONST-P1 ∅, CONST-P6 ∅, notices-intact)".
+
+### [guardrail] F3 — bench absolute-budget deferral dangles unfunded work
+
+- Section: Risks row "Bench noise on shared CI runners … absolute budgets
+  deferred until dedicated-runner evidence"; KC11 "ratio-to-v5-base
+  thresholds ≤1.10× until absolute budgets are evidence-based".
+- Traces to: NG-4 / Rough Approach (implies future evidence-gathering work no
+  slice owns or funds).
+- Proposed edit: append to both: "(post-series and optional — dedicated-runner
+  evidence gathering is not scheduled by this plan; the ratio thresholds are
+  the shipped gate)".
+
+### [guardrail] F4 — keyboard__codes provision vs D-8 generated platform entries
+
+- Section: Open Questions 6 "`keyboard__codes` test provision: stays until a
+  spec exists or its slice decides fate"; KC8/D-8 "platform entry modules
+  generated from the plugin's scan registry (replacing hand-maintained
+  ordered import lists)".
+- Traces to: NG-6 (`keyboard` is on the frozen list).
+- Evidence: `keyboard__codes` has no spec and no consumer ✓; its only
+  presence is the hand-written imports in build/platforms/desktop.js:53 and
+  touch.js:52 — exactly the lists D-8 deletes.
+- Proposed edit: extend OQ6 (or the S1 spec REQ) with: "keyboard internals
+  are Non-Goal-frozen; the generated platform entries must either reproduce
+  the keyboard__codes provision (payload-parity assertion) or record an
+  explicit fate decision — silent drop via generation is forbidden."
+
+### [guardrail] F5 — page__conditional-comment deletion needs an authorization record
+
+- Section: Slice table S6 "`page__conditional-comment` deleted (IE relic)";
+  KC13 same.
+- Traces to: NG-1 (removal shrinks the templating story's surface).
+- Evidence: desktop.blocks/page/__conditional-comment/ carries bemhtml + bh
+  (+ ru.md) ✓; IE conditional comments execute only in IE≤9 — dead under C5
+  (evergreen-only).
+- Why guardrail, not cut: CONST-P6 forces move-or-delete for every platform
+  standalone; hoisting an IE-only relic into common.blocks would enshrine
+  dead code; on C5-supported engines the deletion is behavior-neutral.
+- Proposed edit: S6 row/KC13 gains "(authorized template removal: C5
+  evergreen-only ⇒ IE-only elem is dead code; MIGRATION entry names the elem
+  and both template files; hoist-to-common rejected as dead-code-in-common)".
+
+### [guardrail] F6 — env surface must disposition every ua__dom-read field
+
+- Section: Interface "env / ua surface"; KC1.
+- Traces to: NG-2 via Q5 ("scope env strictly by the audited internal
+  consumer inventory" — strictness cuts both ways: no additions AND no silent
+  gaps inside a frozen consumer's rewrite).
+- Evidence: `ua__dom` reads `ios`, `android`, `bada`, `wp`, `opera`,
+  `chrome`, `screenSize`, `svg`, `landscape` (+ width/height via the
+  orientchange payload) ✓ (touch.blocks/ua/__dom/ua__dom.js); `bada`/`wp`
+  appear nowhere in the env surface.
+- Proposed edit: add a disposition table to the env/ua surface — "{ios,
+  android, browser.opera/chrome, screenSize, svg, landscape, width, height,
+  orientchange} → env; {bada, wp} → <died with legacy per Q5 | encoded in
+  env.platform> (decided in S1 spec, each UA-derived getter with a dedicated
+  unit as prd-align-1 already requires)".
+
+### [should-cut] F7 — Node matrix realignment to [20,24]
+
+- Section: Implementation Plan, CI wiring: "Node matrix aligned to the picked
+  floor ([20,24])"; Slice table S0 "Node floor pinned".
+- Traces to: NG-4 (CI change required by no slice).
+- Evidence: current `test` matrix is [20,22] ✓; engines already ">=20" ✓; no
+  S0–S6 requirement depends on Node-24-only behavior. The floor argument is
+  already satisfied by the existing 20 entry.
+- Proposed edit: "Node matrix unchanged — the [20] entry already pins the
+  ≥20 floor; revisit 24 only if a slice cites a Node-24-dependent behavior
+  (none identified)."
+
+### Out-of-leg observations (doc defects; not non-goal findings)
+
+1. Data Model 5 "Ledgers: … CONST-P6 baseline (3→∅)" contradicts the
+   prd-align-1 re-baseline (7 groups/12 files) fixed everywhere else (Exec
+   Summary, S0 row, KC13). Should read (7→∅) — the ledger row is the ratchet
+   substrate, so the stale number is material for S0.
+2. env's orientchange should pin the old Android shrink-guard heuristic (fire
+   only when landscape AND width both change ✓ — touch.blocks/ua/ua.js resize
+   handler) in the S1 emulation-parity tests; KC1's "one native resize
+   listener dispatching CustomEvent" doesn't say whether the dedup survives.
+
+## Confidence
+
+High. Every load-bearing claim marked ✓ was verified directly against the repo
+@ f2ab61e (package.json exports/repository/peerDeps; touch ua / ua__dom /
+desktop ua sources; ci.yml matrix; build/vite.config.js UMD + jquery globals;
+vite-plugin-bem-levels.js dead converter; loader_type_js signature incl. the
+absent timeout; keyboard__codes platform-entry imports; page elem template
+files; test/dist; docs BEMDOM count). F2/F3 are interpretive (intent-reading
+of rationale prose) and flagged as such; F7 could be argued either way, but
+nothing in the doc today justifies the matrix change.

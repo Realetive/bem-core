@@ -1,0 +1,287 @@
+✓ bc-4n5 · PRD review (arch-overhaul): stakeholders   [● P2 · CLOSED]
+Owner: opencode-gc-f2fc · Assignee: bem-core/gastown.polecat · Type: task
+Created: 2026-09-17 · Updated: 2026-09-17
+
+DESCRIPTION
+
+  You are one leg of a parallel PRD review for the bem-core v5 architecture   
+  overhaul.                                                                   
+                                                                              
+  Repo root: /Users/ryganin/gc/bem-core/bem-core (branch v5, already cloned). 
+  PRD to review: /Users/ryganin/gc/bem-core/bem-core/.prd-reviews/arch-       
+  overhaul/prd-draft.md                                                       
+  Project constitution (binding constraints): /Users/ryganin/gc/bem-core/bem- 
+  core/CONSTITUTION.md                                                        
+                                                                              
+  Standard instructions:                                                      
+                                                                              
+  • Read the PRD draft file (and CONSTITUTION.md) first.                      
+  • Explore the repo as needed to ground your findings (common.blocks,        
+  desktop.blocks, touch.blocks, build/).                                      
+  • Produce your FULL report in the bead notes of this bead (gc bd update or  
+  notes as you close) using the report structure below.                       
+  • Mail the coordinator bem-core/opencode-1 when complete: gc mail send bem- 
+  core/opencode-1 -s "PRD review leg  complete" -m " closed".                 
+  • Do NOT push code, do NOT modify repo files, do NOT touch unrelated work.  
+  Review only.                                                                
+  • Be specific: cite PRD sections and repo paths. Breadth over politeness.   
+                                                                              
+  Report structure (markdown):                                                
+                                                                              
+  #                                                                           
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ## Observations                                                             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  Leg focus: stakeholders. Who is missing: external library consumers (peer   
+  dep jquery ^4 today), spec/test maintainers, benchmark keepers, docs readers
+  (ru/en), downstream fork users? Surface conflicting needs (e.g. compat      
+  escape hatch vs clean break) and who must sign off per slice.               
+
+
+
+NOTES
+
+  # PRD review (arch-overhaul): stakeholders                                  
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  The PRD's stakeholder model is internal-facing. Its six user stories        
+  (US1–US6) cover the modern-stack consumer, internal frozen-consumer         
+  maintainers, platform contributors, slicing engineers, the                  
+  architect/reviewer, and the legacy loader user — but the repo evidence shows
+  several constituencies that the slice plan will hit without anyone named to 
+  answer for them:                                                            
+                                                                              
+  1. **External library consumers of the jquery wrapper and peer-dep          
+  contract** — package.json declares peerDependencies: jquery ^4.0.0; README. 
+  md ("jQuery 4 is a peer dependency — install it alongside") and common.     
+  blocks/jquery/jquery.en.md/.ru.md document the jquery block as a public     
+  block; the dist build externalizes jquery for both ESM and UMD (build/vite. 
+  config.js: external: ['jquery'], globals: { jquery: 'jQuery' }). The wrapper
+  is importable through the package exports ./* wildcard. OQ1 (delete vs      
+  compat shim) is the PRD's only nod to them, and no user story exists.       
+  2. **Touch-platform consumers** — exports["."] points only at .             
+  /dist/desktop/bem-core.mjs; the touch build (dist/touch/) has no exports-map
+  entry. Browser tests run Chromium-only headless (playwright.config.js:      
+  browserName: 'chromium'), so the platform most affected by ua → env (slice  
+  1) has the thinnest verification.                                           
+  3. **Spec/test-harness maintainers** — ~25–28 block spec files run through a
+  hand-rolled legacy shim (test/browser/entry.js modules shim, mocha-in-page);
+  node tests cover only build/plugins and i18n (package.json test script). C3 
+  demands machine-checkable done-criteria, but no slice role owns harness     
+  evolution. Additionally test/dist/build-fixtures.js still requires ENB-era  
+  packages removed in v5 (bem-walk, borschik, libs/bem-pr) — dead tooling that
+  will confuse slice engineers.                                               
+  4. **Benchmark keepers** — i-bem-dom.tests/benchmarks.blocks (b1, b2, page; 
+  page.deps.js depends on jquery). OQ9 flirts with deleting them exactly when 
+  slice 7 (i-bem-dom decomposition) needs perf evidence most; C4 enforces     
+  *behavioral* parity only, perf parity is unowned.                           
+  5. **Docs readers (ru/en)** — the repo is systematically bilingual:         
+  README/README.ru.md, MIGRATION/MIGRATION.ru.md, CHANGELOG/.ru,              
+  CONTRIBUTING/.ru, per-block *.en.md/*.ru.md (jquery, loader, ua all         
+  documented in both languages), plus common.docs/ site content and JSDoc. G7 
+  names only "MIGRATION.md"; the ru twin and the block docs (e.g. loader.en.md
+  documents loader_type_bundle as public API; ua.en.md documents the sniffed  
+  fields) are unmentioned, so ru docs will rot silently.                      
+  6. **The fork's release/versioning owner** — the overhaul ships public-API  
+  shrinkage (CONST-P4) and a possible peer-dep removal, i.e. semver-breaking  
+  changes, but the PRD contains no versioning strategy (5.x vs 6.0), no       
+  deprecation-notice channel, and package.json still points repository.url at 
+  upstream bem/bem-core. Who cuts releases and who publishes is unassigned.   
+  7. **The reviewer's anchor is missing** — CONST-P5 and US5 anchor           
+  before/after comparison at tag v5-base, but git tag is **empty** in the repo.
+  Every slice's parity verification (C4) currently has no comparison point.   
+                                                                              
+  The single most important structural fact: the fork's contributor base is   
+  effectively one human (Realetive) plus agent commits (git log: 41 upstream- 
+  import commits by veged, 8 by Claude, 1 by Realetive). A per-slice sign-off 
+  matrix is therefore not a bureaucracy question — it must explicitly         
+  acknowledge which "approvers" are the same person, and what agent review may
+  approve autonomously vs. what requires the human owner.                     
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  1. **No **v5-base** tag exists.** US5 and C4 both assume diffing against v5-
+  base; git tag returns nothing. Slice 0 (or the PRD itself) must require     
+  creating the tag at the current main HEAD before slice 1 lands, else every  
+  "behavior parity vs v5-base" done-criterion is unverifiable. Owner: fork    
+  owner. *Blocking for slice 1.*                                              
+  2. **OQ1 (jquery escape hatch) has no owner, no evidence base, and no user  
+  story.** Repo facts that constrain it: peer dep jquery ^4 is documented in  
+  README (en+ru); the wrapper is a README-listed public block with bilingual  
+  docs; dist externalizes jquery (ESM import + UMD global jQuery); the ./*    
+  exports wildcard makes bem-core/common.blocks/jquery/jquery.js a resolvable 
+  import path today. Deciding "delete outright" at slice 8 without a consumer 
+  census (even a grep across the fork's own downstream repos) is a gamble;    
+  deciding "compat shim" late forces re-planning of slices 2–5 (interim code  
+  chooses native APIs vs continued $ usage). The PRD should (a) add a US for  
+  the wrapper-consuming external app, (b) schedule the consumer census +      
+  decision milestone before slice 2's spec is written, and (c) tie the peer-  
+  dep removal to a version decision (see gap 6).                              
+  3. **No sign-off matrix.** The PRD never says who approves each slice.      
+  Proposed matrix (see Important Considerations) should be added to the design
+  doc; in fork reality most roles collapse to the fork owner, which should be 
+  stated so agents know when to escalate to the human.                        
+  4. **Perf-parity ownership for slice 7 conflicts with OQ9.** If benchmarks  
+  are deleted as a "pre-Vite relic", the decomposition slice loses its only   
+  measurement harness and C4 will not catch live-collection perf regressions. 
+  The stakeholder question "who attests no perf regression?" is currently     
+  unanswerable. Recommendation: benchmarks survive (migrated off jquery in    
+  slice 2 as planned) through slice 7; deletion decided only afterwards.      
+  5. **Touch verification gap.** touch.blocks/ua/__dom/ua__dom.js reads ua.   
+  ios/android/opera/wp/bada/chrome/svg/landscape/width/height/screenSize —    
+  legacy-platform UA forks. Slice 1 replaces the substrate these read from,   
+  yet Playwright coverage is desktop-chromium-only. Slice 1's done-criteria   
+  need either touch-device emulation in CI or a named touch-domain owner who  
+  signs off the env API shape and the preserved legitimate UA branches (iOS   
+  Safari gesture quirks are the classic case capability detection cannot      
+  answer).                                                                    
+  6. **Versioning and publishing unowned.** Public API shrinkage (CONST-P4) + 
+  possible peer-dep removal = major-version bump under semver; the PRD is     
+  silent. Intermediate slices published with jquery still external but wrapper
+  half-quarantined create confusing intermediate package states. Also         
+  repository.url still points to git://github.com/bem/bem-core.git —          
+  publishing provenance belongs to whoever owns the release role.             
+  7. pointerclick** and friends are an implicit public contract with nobody   
+  attesting.** desktop.blocks/jquery/__event/_type/* special events           
+  (pointerclick, winresize…) are part of the observable event surface external
+  app code can bind (and MIGRATION.md culture treats jquery redefinitions as  
+  user-facing). Slices 4–5 must preserve event-name behavior (_domEvents().   
+  on('pointerclick')); the PRD's OQ3 asks *where* normalization lives but not 
+  *who guarantees the contract* — needs a named attester in those slices'     
+  done-criteria.                                                              
+  8. loader_type_bundle** is documented public API.** loader.en.md/.ru.md     
+  document type bundle with signature; G3's "removed with a documented        
+  migration" is right, but the docs pair must be updated in the same slice and
+  the ru twin explicitly listed (docs-reader stakeholder).                    
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  **Proposed sign-off matrix (to fold into the design doc; roles marked ◆     
+  collapse to the fork owner in practice):**                                  
+                                                                              
+   Slice | Content                      | Must sign off                       
+  -------|------------------------------|-------------------------------------
+   1     | env/ua                       | ◆fork owner + touch-domain owner +… 
+   2     | jquery periphery (dom, idle… | ◆fork owner + benchmark keeper + d… 
+   3     | loader                       | ◆fork owner + docs + legacy loader… 
+   4     | pointerevent normalization   | ◆fork owner + events owner; done-c… 
+   5     | i-bem-dom events native      | ◆fork owner + events owner + build… 
+   6     | inherit decision             | ◆fork owner + library authors' rep… 
+   7     | i-bem-dom decomposition      | ◆fork owner + benchmark keeper (pe… 
+   8     | platform lint + wrapper rem… | ◆fork owner + release owner (peer … 
+                                                                              
+  **Conflicting needs to surface, not bury:**                                 
+                                                                              
+  • *Clean break vs compat escape hatch* — internal desire to delete 30+ kB vs.
+  external contract (peer dep, README docs, ./* import path, UMD global).     
+  These pull slices 2–8 in opposite directions until OQ1 is decided; decide   
+  early.                                                                      
+  • *Benchmark deletion (OQ9) vs perf evidence for slice 7* — as above;       
+  sequencing conflict.                                                        
+  • *CONST-P3 enforcement lint vs platform contributors* — a lint that rejects
+  any touch.blocks/desktop.blocks file without a common ancestor (US3) is     
+  ergonomic only with good error messages and a documented "where does shared 
+  behaviour go" rule; too strict and it fights the override culture, too loose
+  and G6 fails. The lint is repo-local tooling today; if it ever ships in     
+  build/plugins/* (which IS exported via ./build/plugins/*), it becomes public
+  API with its own stakeholders.                                              
+  • *Bilingual doc parity vs slice velocity* — 6–8 slices × (MIGRATION.md +   
+  MIGRATION.ru.md + README + README.ru.md + affected block docs ru/en +       
+  CHANGELOG pair) is real, unestimated work; if unassigned, ru docs rot (the  
+  historical failure mode of this repo family).                               
+  • *Hand-maintained platform barrels* — build/platforms/desktop.js/touch.js  
+  enumerate every block import by hand; every slice that adds (env module),   
+  quarantines (compat-jquery), or removes (wrapper, maybe loader_type_bundle) 
+  blocks must edit both barrels. The build/plugin maintainer is a quiet       
+  stakeholder in all eight slices.                                            
+                                                                              
+  **Stakeholders the PRD already covers adequately:** US1 (modern consumer),  
+  US2 (frozen-consumer maintainers), US3 (platform contributors), US4 (slicing
+  engineers), US5 (architect/reviewer — except the missing tag anchor), US6   
+  (legacy loader users).                                                      
+                                                                              
+  ## Observations                                                             
+                                                                              
+  • package.json: peerDependencies: {"jquery": "^4.0.0"}, exports = . →       
+  desktop dist only, ./build/plugins/*, ./* wildcard; engines.node >= 20;     
+  repository.url points at upstream bem/bem-core.                             
+  • build/vite.config.js: lib build, formats es+umd, external: ['jquery'], UMD
+  global jQuery, per-platform outDir dist/{desktop,touch}.                    
+  • build/platforms/{desktop,touch}.js: hand-written import barrels; touch    
+  additionally imports bem:ua__dom; both import bem:jquery,                   
+  bem:loader_type_bundle.                                                     
+  • common.blocks/jquery/: wrapper re-exports npm jquery; documented in       
+  jquery.en.md/jquery.ru.md; README lists jquery — jQuery among the blocks.   
+  • Real ua field readers inside the repo: touch.blocks/ua/__dom/ua__dom.js   
+  (ios, android, opera, wp, bada, chrome, svg, landscape, width, height,      
+  screenSize), desktop.                                                       
+  blocks/jquery/__event/_type/jquery__event_type_winresize.js (ua.msie),      
+  common.blocks/ua/__svg (deps only). External readers unknown — PRD OQ2's    
+  "what do real consumers read" also applies internally: the answer is *mostly
+  touch ua__**dom*.                                                           
+  • loader_type_bundle documented as public in loader.en.md/.ru.md; no .deps. 
+  js consumers of loader inside the repo (rg over deps files: none) — supports
+  "delete with migration" but external usage unknowable from here.            
+  • Tests: npm test = node:test over build/plugins/vite-plugin-bem-levels.    
+  test.js + i18n.test.js; npm run test:browser = single Playwright spec       
+  (test/browser.spec.js) driving a Vite dev server page that loads all block  
+  specs via the modules shim (test/browser/entry.js); Chromium-only.          
+  • test/dist/build-fixtures.js requires bem-walk, borschik, libs/bem-pr —    
+  packages/dirs removed in v5; dead legacy fixture tooling.                   
+  • Benchmarks: common.blocks/i-bem-dom/i-bem-dom.tests/benchmarks.blocks/{b1,
+  b2,page}; page.deps.js deps jquery + i-bem-dom__init (the CONST-P1 allowlist
+  entry).                                                                     
+  • Docs surface: bilingual pairs for README/CHANGELOG/CONTRIBUTING/MIGRATION,
+  per-block *.en.md/*.ru.md (incl. jquery, loader, ua, dom, idle…), common.   
+  docs/ (bem-core, bemjson, changelog, i-bem-js with ~13 ru/en doc pairs,     
+  migration), JSDoc config + npm run docs.                                    
+  • CI (.github/workflows/ci.yml): lint, node tests (20/22 matrix), Playwright
+  (chromium), build + dist artifact upload. No touch-device job; no perf job. 
+  • Git: branch v5, **no tags at all** (v5-base missing); contributors = veged
+  (upstream import), Claude ×8 (fork modernization), Realetive ×1 (fork owner).
+  • CHANGELOG 5.0.0 documents "Vite produces platform-specific builds (desktop,
+  touch) with jQuery as an external dependency" — jquery-external dist is the 
+  *shipped, documented* consumer contract.                                    
+  • MIGRATION.md v5 section uses jquery__event_type_pointerclick as the       
+  canonical redefinition example — pointer-event special events are part of   
+  the documented migration surface.                                           
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  • **High confidence** on repo-grounded facts (exports map, peer dep, docs   
+  inventory, test topology, benchmarks, missing tag, contributor base) — all  
+  directly verified in the working copy at branch v5.                         
+  • **Medium confidence** on the proposed sign-off matrix — it is a           
+  recommendation grounded in the slice list, not something recoverable from   
+  the repo; the fork owner may legitimately re-cut the roles.                 
+  • **Low confidence / unknowable from this repo** on the size and behavior of
+  the *external* consumer population (jquery-wrapper importers,               
+  loader_type_bundle users, ua field readers outside the fork, downstream bem-
+  components-style users). No telemetry exists; the consumer census           
+  recommended in Critical Gap 2 is the only way to raise this, and until then 
+  OQ1 should default to the conservative branch (optional compat shim with EOL
+  date) rather than outright deletion.                                        
+  • The PRD's internal stakeholder coverage (US1–US6) was cross-checked and   
+  found reasonable; no missing internal constituency beyond the               
+  harness/docs/release roles named above.                                     
+
+
+
+METADATA
+  coordinator: bem-core/opencode-1
+  review_id: arch-overhaul
+  review_leg: stakeholders
+  review_phase: prd
+
+BLOCKS
+  ← ✓ bc-fnl: input convoy for bc-4n5 ● P2
+

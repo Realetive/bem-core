@@ -1,0 +1,243 @@
+✓ bc-qmr · PRD review (arch-overhaul): ambiguity   [● P2 · CLOSED]
+Owner: opencode-gc-f2fc · Assignee: bem-core/gastown.polecat · Type: task
+Created: 2026-09-17 · Updated: 2026-09-17
+
+DESCRIPTION
+
+  You are one leg of a parallel PRD review for the bem-core v5 architecture   
+  overhaul.                                                                   
+                                                                              
+  Repo root: /Users/ryganin/gc/bem-core/bem-core (branch v5, already cloned). 
+  PRD to review: /Users/ryganin/gc/bem-core/bem-core/.prd-reviews/arch-       
+  overhaul/prd-draft.md                                                       
+  Project constitution (binding constraints): /Users/ryganin/gc/bem-core/bem- 
+  core/CONSTITUTION.md                                                        
+                                                                              
+  Standard instructions:                                                      
+                                                                              
+  • Read the PRD draft file (and CONSTITUTION.md) first.                      
+  • Explore the repo as needed to ground your findings (common.blocks,        
+  desktop.blocks, touch.blocks, build/).                                      
+  • Produce your FULL report in the bead notes of this bead (gc bd update or  
+  notes as you close) using the report structure below.                       
+  • Mail the coordinator bem-core/opencode-1 when complete: gc mail send bem- 
+  core/opencode-1 -s "PRD review leg  complete" -m " closed".                 
+  • Do NOT push code, do NOT modify repo files, do NOT touch unrelated work.  
+  Review only.                                                                
+  • Be specific: cite PRD sections and repo paths. Breadth over politeness.   
+                                                                              
+  Report structure (markdown):                                                
+                                                                              
+  #                                                                           
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ## Observations                                                             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  Leg focus: ambiguity. Flag vague language, contradictions, undefined terms, 
+  unclear boundaries. E.g. what exactly is the public API (open question 8)?  
+  What does override-only mean mechanically? What counts as a slice done?     
+  Which terms need a glossary?                                                
+
+
+
+NOTES
+
+  # PRD Review (arch-overhaul): Ambiguity                                     
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  The PRD's direction is clear, but its key normative terms — "public API",   
+  "override-only", "slice done", "quarantine" — are undefined or multiply-    
+  defined, and at least three factual anchors are wrong or missing against the
+  v5 tree: the v5-base tag does not exist, "pointerevent normalization" does  
+  not exist in this codebase, and loader_type_js has no timeout semantics to  
+  preserve. The most consequential ambiguity is the public API (open q8): the 
+  root export is a side-effect-only barrel, the export map exposes every file 
+  via ./*, and the flagship user story US1 imports a named binding that no    
+  entry file exports. "Override-only" (G6/CONST-P3) has at least three        
+  coexisting mechanical shapes in the repo, and ua — the PRD's own example of 
+  a "true override" — has no common ancestor to override. Defining these terms
+  in the design doc (glossary + v5-base tag creation + corrected problem      
+  statement) is a prerequisite for slice specs to be verifiable.              
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  1. **Public API triple-undefined (open q8, US1, C4, G5).**                  
+      • Root export ./dist/desktop/bem-core.mjs is built from                 
+      build/platforms/desktop.js, which contains only side-effect imports and 
+      zero export statements — the dist barrel exports no named bindings today.
+      US1's import { BemDom } from 'bem-core' is written against an API shape 
+      that does not exist. Creating it would be a "public API addition", which
+      Non-Goals forbids. Resolve: does the overhaul create named exports      
+      (amending Non-Goals), or is consumption deep-import-only?               
+      • package.json "exports": { "./*": "./*" } makes every file in the repo 
+      deep-importable. Is a deep import of common.blocks/** public API for    
+      CONST-P4 purposes? If yes, the surface can never meaningfully shrink; if
+      no, define the boundary. G5's "internal structure invisible to          
+      consumers" is unimplementable while the wildcard export map stands.     
+      • dist/ is not committed; the "exact inventory" exists only after npm   
+      run build. No committed manifest and no export-pinning test exist       
+      (test/browser.spec.js runs mocha suites; test/dist checks build         
+      artifacts; neither freezes an export surface).                          
+      • CONST-P4 names i-bem, i-bem-dom, events as the public API; the PRD    
+      treats loader (US6), ua (G2), dom (open q7), and inherit (G4) as public 
+      too. Which list governs CONST-P4 policing?                              
+      • The package root export points at the desktop build only; is          
+      dist/touch/* public? Undefined.                                         
+  2. **Parity anchor missing: tag **v5-base** does not exist** (git tag -l is 
+  empty; repo has zero tags). Problem statement line 5, US5, C4, and CONST-P5 
+  all compare against it. Who creates the tag, at which commit, and when      
+  (before slice 1)? Until then "behavior parity by default" (C4) is           
+  unverifiable and any done-criterion referencing parity is not machine-      
+  checkable, undermining C3.                                                  
+  3. **Phantom pointerevent work.** "Pointerevent normalization" appears in   
+  the problem statement (i-bem-dom monolith bullet), open q3, and slice 4 —   
+  but there are zero pointer/PointerEvent/pointerclick references in          
+  production code (grep across common/desktop/touch blocks; hits only in      
+  CHANGELOG/MIGRATION history docs). The only jquery __event_type_*           
+  redefinition in the repo is desktop.                                        
+  blocks/jquery/__event/_type/jquery__event_type_winresize. Either slice 4    
+  targets winresize-style event specials (needs rewrite) or it is scoped      
+  around work that does not exist. Correct the PRD text before design legs    
+  build on it.                                                                
+  4. **"Override-only" mechanically undefined, and the PRD's own example      
+  contradicts the repo (G6, US3, CONST-P3, slices 1/8).**                     
+      • Three coexisting shapes today: (a) base-wrapping function — desktop.  
+      blocks/jquery/__config/jquery__config.js exports function(base){ return 
+      base }; (b) side-effect redefinition via generated barrel — desktop.    
+      blocks/jquery/__event/_type/jquery__event_type_winresize.js mutates $.  
+      event.special (mechanism: build/plugins/vite-plugin-bem-levels.js:411-  
+      419, same module name from different levels, barrel merge); (c)         
+      standalone alternative implementations — desktop.blocks/ua/ua.js (34    
+      lines) vs touch.blocks/ua/ua.js (204 lines).                            
+      • common.blocks/ua/ contains no ua.js — only templates and __svg. The   
+      problem statement calls ua a "true override"; it is actually standalone 
+      per-platform logic with no common ancestor. US3's proposed CI rule      
+      ("rejects any file in touch.blocks that doesn't correspond to a common. 
+      blocks ancestor") would reject both current ua.js files. Define         
+      "corresponds to an ancestor" (module defined in common? block directory 
+      exists?) before specifying the rule.                                    
+      • CONST-P3 "no logic duplication" is unenforceable as stated: desktop   
+      and touch ua duplicate nothing, yet both are standalone platform logic. 
+      Is "standalone when no common base exists" legal?                       
+  5. **jQuery ratchet has a mechanical hole; allowlist=∅ does not imply zero  
+  jquery.**                                                                   
+      • CONST-P1's check greps *.deps.js for 'jquery' but excludes paths      
+      matching (^|/)jquery/. desktop.                                         
+      blocks/jquery/__event/_type/jquery__event_type_winresize.deps.js — a    
+      real jquery consumer (its .js imports bem:jquery) — is invisible to the 
+      ratchet. The 9 allowlist entries and the 9 actual bem:jquery importers  
+      are different sets (benchmarks page.deps is counted; winresize is not). 
+      • No slice covers desktop.blocks/jquery/* (config + winresize) or       
+      common.blocks/jquery/__config. Slice 8 says "jquery wrapper deleted or  
+      quarantined" — does that include the desktop redefs? If the wrapper is  
+      deleted, does peerDependencies: { jquery: ^4.0.0 } go too? Unspecified. 
+      • "Quarantined as an optional compat shim behind a documented escape    
+      hatch" (G1) and open q1's bem-core/compat-jquery — "quarantine" and     
+      "escape hatch" have no mechanical definition (separate package? export- 
+      map subpath? build flag? retained peer dep?). This decides the peer-dep 
+      fate and needs a glossary entry.                                        
+  6. **Slice "done" is circular (G7, C2, C3, US4).** C3 points at "sdd-check  
+  style", but only CONST-P1 (deps grep) and a LICENSE existence check exist as
+  machine checks. Behavior-parity slices (4, 5, 7) have no defined            
+  verification harness — parity vs v5-base is not machine-checkable without   
+  (a) the tag (gap 2) and (b) a specified comparison procedure ("documented   
+  per-slice verification" is promised by US5 but never defined). What counts  
+  as a "requirement" for the <=12 cap is undefined; "~6-8 slices" hedges while
+  the Rough Approach enumerates exactly 8.                                    
+  7. **G3 invents semantics.** loader_type_js (62 lines) implements load/error
+  callbacks with in-flight dedup — there is no timeout. "Semantics (async     
+  script load, error reporting, timeout)" must be corrected to what exists, or
+  slice 3's parity bar is unknowable. Similarly US6 promises "keeps working ...
+  or follows a documented one-line migration" — which branch is the contract? 
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  • **Glossary needed** (non-exhaustive): override; slice; requirement; public
+  API; quarantine/escape hatch; "deprecated alias" (open q2 — console warning?
+  docs-only?); env vs capability/feature detection (G2 uses both              
+  interchangeably); "input modality"; "live collection/ranges" (G5) vs the    
+  actual __collection block; "periphery -> core"; "API tests" (slice 7 — none 
+  exist today, type unspecified); "slice beads DAG" artifact shape (C6/Non-   
+  Goals — what fields does a slice bead carry? US4 assumes specs with <=12    
+  requirements, never defined).                                               
+  • **MIGRATION.md convention undefined**: it is version-anchored (## 5.0.0,  
+  ## 4.0.0). Where do slice-level migration notes go — unreleased section?    
+  per-slice heading? Also en/ru duplication (MIGRATION.ru.md): do slices      
+  update both?                                                                
+  • **ua consumer inventory (open q2) is partially answerable now**: internal 
+  readers are touch.blocks/ua/__dom/ua__dom.js (reads ua.                     
+  ios/android/opera/chrome/iphone/ipad/bada/wp/platform/device) and desktop.  
+  blocks/jquery/__event/_type/jquery__event_type_winresize.js (ua.msie &&     
+  document.documentMode < 9). Pin the surviving field list; external consumers
+  are unknowable from the repo — declare the assumption.                      
+  • **Node floor mismatch**: C5 says Node >=20 (engines field), problem       
+  statement/PLAN say Node 24 toolchain. Which is the actual floor?            
+  • **US3's rule mentions only touch.blocks**; G6/CONST-P3 cover desktop.     
+  blocks too — the rule must cover both.                                      
+  • **Slice 2's "allowlist shrinks by ~****3 entries"** is exactly 3 by its   
+  own list (dom, idle, benchmarks page) — drop the tilde or explain the hedge.
+  • **Empty-slice case**: if G4's decision is "keep inherit frozen", slice 6  
+  is empty — is an empty/merged slice allowed within "~6-8"?                  
+  • **Non-Goal "No bundler/CI changes beyond what architectural slices        
+  require"**: "require" is judgment, not a criterion; the override lint rule  
+  (G6) and any export-map tightening ARE bundler/config changes and should be 
+  acknowledged as in scope.                                                   
+  • **Open q9 vs slice 2 conflict**: slice 2 plans to migrate the benchmark   
+  page off jquery; open q9 asks whether the benchmarks suite should be deleted
+  as a pre-Vite relic. Reconcile: delete-in-slice-2 or migrate.               
+                                                                              
+  ## Observations                                                             
+                                                                              
+  • Verified PRD numbers, all accurate: i-bem-dom.js = 1220 lines; dom.js =   
+  111; inherit.vanilla.js = 121; CONST-P1 allowlist = 9 entries; npm jquery   
+  imported in exactly one file (the wrapper) while 9 production modules import
+  bem:jquery.                                                                 
+  • "Production source imports it in exactly one file (the wrapper)" is       
+  technically true for the npm package but easily misread — the jquery-       
+  touching surface is the wrapper plus 9 bem:jquery importers plus desktop    
+  winresize.                                                                  
+  • Override mechanics today = build-time barrel merging in vite-plugin-bem-  
+  levels (same module name from multiple levels; lowest level = base, later = 
+  redefinitions) plus hand-maintained platform entry files                    
+  build/platforms/{desktop,touch}.js. Any override-only lint rule must either 
+  be consistent with this resolution model or explicitly change it.           
+  • Repo state otherwise supports the PRD premise: ESM sources, Vite 8,       
+  engines node>=20, ESLint 10, Playwright present; branch v5; MIGRATION.md    
+  documents ym->ESM and redefinition-via-barrel behavior; last commits are the
+  SDD constitution and the Vite 8/Node 24 upgrade.                            
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  High confidence on factual findings — all claims verified by direct         
+  inspection of the v5 tree (greps, file reads, git tag -l, package.json).    
+  Interpretive ranking (critical vs important) reflects this leg's ambiguity  
+  focus; a different reviewer might rank the loader timeout item lower. Main  
+  residual uncertainty: whether "pointerevent normalization" refers to        
+  something in an earlier/unpushed state of the fork or upstream history      
+  (CHANGELOG mentions historical jquery__event_type_pointer polyfills) —      
+  either way the conclusion "not present in the current codebase" holds.      
+  Public-API analysis assumes package.json's export map is the consumption    
+  contract; if a different distribution model is intended (e.g., generated    
+  subpath exports in a later convoy), the finding stands but the remedy       
+  changes.                                                                    
+
+
+
+METADATA
+  coordinator: bem-core/opencode-1
+  gc.work_outcome: shipped
+  review_id: arch-overhaul
+  review_leg: ambiguity
+  review_phase: prd
+
+BLOCKS
+  ← ✓ bc-50j: input convoy for bc-qmr ● P2
+

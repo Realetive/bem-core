@@ -1,0 +1,383 @@
+✓ bc-cj7 · PRD review (arch-overhaul): feasibility   [● P2 · CLOSED]
+Owner: opencode-gc-f2fc · Assignee: bem-core/gastown.polecat · Type: task
+Created: 2026-09-17 · Updated: 2026-09-17
+Close reason: Closed
+
+DESCRIPTION
+
+  You are one leg of a parallel PRD review for the bem-core v5 architecture   
+  overhaul.                                                                   
+                                                                              
+  Repo root: /Users/ryganin/gc/bem-core/bem-core (branch v5, already cloned). 
+  PRD to review: /Users/ryganin/gc/bem-core/bem-core/.prd-reviews/arch-       
+  overhaul/prd-draft.md                                                       
+  Project constitution (binding constraints): /Users/ryganin/gc/bem-core/bem- 
+  core/CONSTITUTION.md                                                        
+                                                                              
+  Standard instructions:                                                      
+                                                                              
+  • Read the PRD draft file (and CONSTITUTION.md) first.                      
+  • Explore the repo as needed to ground your findings (common.blocks,        
+  desktop.blocks, touch.blocks, build/).                                      
+  • Produce your FULL report in the bead notes of this bead (gc bd update or  
+  notes as you close) using the report structure below.                       
+  • Mail the coordinator bem-core/opencode-1 when complete: gc mail send bem- 
+  core/opencode-1 -s "PRD review leg  complete" -m " closed".                 
+  • Do NOT push code, do NOT modify repo files, do NOT touch unrelated work.  
+  Review only.                                                                
+  • Be specific: cite PRD sections and repo paths. Breadth over politeness.   
+                                                                              
+  Report structure (markdown):                                                
+                                                                              
+  #                                                                           
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ## Observations                                                             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  Leg focus: feasibility. Identify hard technical problems and expensive      
+  assumptions: pointerevent normalization without jquery (jquery              
+  _*event_**type** redefs), event delegation engine on native listeners, i-   
+  bem-dom__init build-time barrel vs runtime registry, loader_type_js on      
+  import(), inherit on native classes. Check prerequisites and ordering risks 
+  in the Rough Approach.                                                      
+
+
+
+NOTES
+
+  # PRD review (arch-overhaul): feasibility                                   
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  The PRD's direction (strangler, periphery → core, jquery-free) is sound, but
+  three of its                                                                
+  eight slices rest on stale or wrong premises about the current codebase, and
+  the plan's                                                                  
+  critical-path slice (events off jquery) is under-scoped. Key corrections    
+  found by reading                                                            
+  the code:                                                                   
+                                                                              
+  1. **Slice 4 (pointerevent normalization) has no source material.** The     
+  jquery                                                                      
+  __event_type_pointerclick/pointernative/pointerpressrelease redefs do not   
+  exist in the                                                                
+  fork. The only __event_type_* file on disk is                               
+  desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.js, which  
+  is IE8-only                                                                 
+  dead code (ua.msie && document.documentMode < 9) that can never fire under  
+  C5                                                                          
+  (evergreen browsers). Pointer references survive only in stale artifacts    
+  (test/dist/fixtures/{desktop,touch}.html:54-56 reference spec files that    
+  don't exist;                                                                
+  PLAN.md, MIGRATION.md historical notes).                                    
+  2. **The real cost is not the jquery wrapper, it's the jQuery API surface.**
+  7 production                                                                
+  files import bem:jquery; i-bem-dom.js alone uses ~25 distinct jQuery APIs   
+  (collections, traversal, delegation, $.event.special, .trigger with         
+  positional                                                                  
+  extra args, $.parseHTML(keepScripts=true), $.uniqueSort, $.fn.bem plugin).  
+  3. **A hard prerequisite is missing: tag **v5-base** does not exist** in    
+  this clone                                                                  
+  (git tag → empty; git log v5-base fails). CONST-P5 and US5 (behavior-diff vs
+  v5-base) are unenforceable until it's created. Must become a slice-0 item.  
+  4. **Feasibility verdict per focus area:** delegation engine on native      
+  listeners —                                                                 
+  feasible but the highest-risk, largest slice; loader_type_js on import() —  
+  feasible                                                                    
+  with semantic caveats (classic vs module scripts, timeout, URL              
+  normalization);                                                             
+  loader_type_bundle — dead in an ESM world, recommend delete (zero in-repo   
+  consumers);                                                                 
+  inherit on native classes — only the "keep frozen" option (a) is low-risk;  
+  (b)/(c)                                                                     
+  conflict with dynamic __base (source-string detection) and re-open semantics
+  (inherit.self class mutation); init barrel vs runtime registry — barrels    
+  work and                                                                    
+  should stay; the PRD conflates module-redefinition barrels with init        
+  concerns.                                                                   
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  1. **PRD slice 4 premise is false** (see Summary). Slice 4 should be        
+  replaced by                                                                 
+  "delete winresize + purge stale pointer references                          
+  (fixtures/PLAN/MIGRATION)" and folded                                       
+  into slice 5 or 8; the design doc must re-derive the slice count (6-8       
+  becomes plausibly                                                           
+  5-7) and dependency edges.                                                  
+  2. **Slice 1 (env/ua) has a hidden jquery dependency.** touch.blocks/ua/ua. 
+  js imports                                                                  
+  jquery and uses $win.bind('resize').trigger('orientchange', data) for the   
+  synthetic                                                                   
+  orientchange event; touch.blocks/ua/__dom/ua__dom.js consumes it via        
+  _domEvents(bemDom.win).on('orientchange'). touch.blocks/ua/ua.deps.js is one
+  of the                                                                      
+  9 CONST-P1 allowlist entries, yet the PRD puts only dom, idle, benchmark    
+  page in                                                                     
+  slice 2's "~3 entries". Either slice 1 waits for slice 5's native-event     
+  engine, or it                                                               
+  must emit a native CustomEvent('orientchange') — which only works if the new
+  delegation engine accepts synthetic native events. Ordering risk: flag it.  
+  3. **Slice 2 is not pure periphery.** common.blocks/dom/dom.js has a jQuery-
+  typed public                                                                
+  API (contains(ctx, domElem) over jQuery .each/.index, getFocused() returns  
+  jQuery). Taking it off jquery either changes public signatures (CONST-P4    
+  migration doc                                                               
+  required — that's open Q7, forced early) or keeps internal jquery (G1       
+  violated; the                                                               
+  allowlist can't reach zero). idle IS trivial ($(document).on/off 3 event    
+  names).                                                                     
+  The benchmark page (i-bem-dom.tests/benchmarks.blocks) is only referenced by
+  the dead                                                                    
+  pre-Vite test/dist harness (build-fixtures.js is CJS require-based, cannot  
+  run                                                                         
+  under "type":"module"); deleting it is the cheap allowlist win.             
+  4. **No **v5-base** tag** (see Summary). Also dist/ is not committed, yet   
+  package.json                                                                
+  exports["."] points at dist/desktop/bem-core.mjs — API-pinning tests (US5,  
+  open Q8)                                                                    
+  must build first; touch platform has no export entry at all.                
+  5. **US1 "tree-shaking works" is likely unachievable as stated.** The       
+  distribution model                                                          
+  (side-effect platform entry importing everything + redefinition barrels that
+  force full                                                                  
+  module evaluation) is structurally hostile to tree-shaking. Either scope US1
+  down                                                                        
+  ("no jquery in bundle") or make per-block exports a design-doc topic. As    
+  written it's                                                                
+  an expensive, probably-impossible acceptance criterion.                     
+  6. **Touch platform has zero test coverage.** build/vite.test.config.js     
+  hardcodes                                                                   
+  platform: 'desktop'; Playwright runs chromium only. Slice 1 (ua/env) and the
+  touch                                                                       
+  allowlist entry can't be regression-verified today. Slice 1 needs a touch   
+  test target                                                                 
+  or must accept desktop-only verification (documented).                      
+  7. **G6 lint needs a baseline exception list.** desktop.                    
+  blocks/page/__conditional-comment,                                          
+  touch.blocks/page/__icon etc. have no common ancestor; some platform files  
+  are                                                                         
+  template techs (bemhtml/bh) where "override" is fuzzy. Without a ratchet-   
+  style                                                                       
+  allowlist (mirroring CONST-P1) the G6 lint either fails immediately or gets 
+  ignored.                                                                    
+  8. i-bem-dom__init** open question (Q5) rests on a misreading.** There is no
+  ym                                                                          
+  monkey-patch and no init barrel today: __init.js is a 15-line passthrough;  
+  _auto                                                                       
+  is $(fn) + nextTick. The build-time barrel machinery (vite-plugin-bem-levels
+  generateBarrel, chained redef(base) per cross-level module) is about *module
+  **redefinition* (how ua/jquery forks compose), not init. A runtime init     
+  registry                                                                    
+  would LOSE static ESM ordering (blocks redefining others load after via     
+  import graph).                                                              
+  Recommendation: keep barrels; document the contract; make _auto use native  
+  DOMContentLoaded. Note also a latent plugin hazard: generateBarrel chains   
+  any                                                                         
+  same-named module across levels and calls it as a function — if a           
+  redefinition isn't                                                          
+  authored as export default function(prev), the barrel calls a non-function. 
+  The                                                                         
+  platform-cleanup slice must either extend the plugin (validate              
+  isRedefinition) or                                                          
+  audit all cross-level chains.                                               
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ### A. Event delegation engine on native listeners (slice 5) — the critical 
+  path                                                                        
+                                                                              
+  Concrete jQuery semantics that must be reproduced (all verified in source): 
+                                                                              
+  • Delegated binding with self-match double-bind: i-bem-dom__events.js:81-82 
+  (bindDomElem.on(event, bindSelector, data, handler) PLUS                    
+  bindDomElem.is(bindSelector) && bindDomElem.on(event, data, handler) —      
+  jQuery                                                                      
+  delegated .on(selector) never matches the bound element itself).            
+  • Handler this/target semantics: i-bem-dom__events_type_dom.js:19-36 —      
+  jQuery sets                                                                 
+  this = delegateTarget (element matching selector), distinct from e.target;  
+  wrapper                                                                     
+  computes $(e.target).closest(ctxSelector) then entityDomNode.bem(ctx) (the  
+  $.fn.bem plugin at i-bem-dom.js:912) and sets e.bemTarget = $(this).bem(...).
+  Native engine must recompute both and keep a compat event facade (e.data, e.
+  bemTarget).                                                                 
+  • BEM synthetic events: i-bem-dom__events_type_bem.js registers $.event.    
+  special stubs,                                                              
+  then ctx.domElem.trigger(event, [data, flags, originalEvent]) — positional  
+  extra                                                                       
+  arguments (native dispatch has only detail), flags.fns per-handler dedup    
+  across                                                                      
+  mixed-entity DOM nodes, flags.propagationStoppedDomNode cross-node          
+  propagation-stop                                                            
+  emulation, bindDomElem.index(e.target) (#1525 nested same-type skip), $.    
+  contains.                                                                   
+  Design decision needed: BEM events don't need real DOM events at all — a    
+  pure registry                                                               
+  (walk entity containment) is simpler and drops $.event.special entirely;    
+  delegation                                                                  
+  semantics are the only reason real bubbling is used today.                  
+  • Traversal: _findEntities (i-bem-dom.js:601-639) runs this.                
+  domElem[select](selector)                                                   
+  for select ∈ {find, parents, filter} with jQuery selectors (incl. :first).  
+  Native                                                                      
+  querySelectorAll/closest/parent-walk covers BEM's simple class selectors —  
+  feasible,                                                                   
+  but this means slice 5 drags in collection + traversal internals, i.e. slice
+  5 and                                                                       
+  slice 7 (decomposition) overlap heavily. Recommend the design doc specify   
+  the internal                                                                
+  "DomElem/collection + event facade" contract BEFORE slices 2/5 start — dom, 
+  __events                                                                    
+  and i-bem-dom all consume it.                                               
+  • Also in scope but unmentioned by the PRD: getJqueryCollection uses        
+  $.parseHTML(html, null, true) — keepScripts=true; jQuery .append(html)      
+  executes                                                                    
+  scripts synchronously. Native replacement (template/DOMParser) changes      
+  script                                                                      
+  execution semantics — needs an explicit compat decision (behavior parity C4).
+  • Mitigants: excellent existing spec coverage (i-bem-dom.spec.js 1854 lines;
+  events_type_dom 1069;                                                       
+  events_type_bem 1013) — the engine can be built test-first against v5-base  
+  behavior.                                                                   
+                                                                              
+  ### B. loader_type_js on import() (slice 3) — cheap, independent, caveats   
+                                                                              
+  • Current impl is already native script-injection with callback dedup; zero 
+  jquery.                                                                     
+  In-repo consumers: only build/platforms/*.js side-effect imports + test     
+  entry.                                                                      
+  • Caveats to spec: import() loads ES modules only — classic third-party     
+  script URLs                                                                 
+  (maps APIs etc.) fail; either dual mode (script tag fallback) or documented 
+  break.                                                                      
+  No native timeout (bundle loader's 30s pattern → Promise.race). URL         
+  normalization                                                               
+  replaces the file: protocol hack. Error taxonomy differs (network vs parse; 
+  CSP                                                                         
+  module rules). loader_type_bundle depends on the ym bundle callback contract
+  (load._loaded, window._ycssjs, bundle.js.call(globalThis)) — the format     
+  itself is                                                                   
+  dead; recommend delete with migration note (G3 option), not reimplementation.
+                                                                              
+  ### C. inherit on native classes (G4) — recommend deciding "keep frozen"    
+  early                                                                       
+                                                                              
+  • inherit.vanilla.js:23-25: __base chaining is detected by stringifying     
+  function                                                                    
+  source (prop.toString().indexOf('.__base')) and realized by dynamic this.   
+  __base                                                                      
+  swapping at call time. Native super is lexically bound — cannot express it. 
+  • Re-open semantics: declEntity (i-bem.vanilla.js:160-163) re-declaring an  
+  existing                                                                    
+  entity name calls inherit.self(base, ...) — mutates the live class;         
+  instances and                                                               
+  subclasses observe new methods. Native classes have no equivalent without   
+  rebuild-the-world or transpilation.                                         
+  • Mixins: inherit([a, b]) multiple-inherits by copying prototype props      
+  (applyMixins); native class methods are non-enumerable, so the Object.keys- 
+  based                                                                       
+  copy silently drops them — any native-authoring path must move to           
+  Object.getOwnPropertyNames (silent-failure hazard, needs an explicit        
+  requirement).                                                               
+  • Verdict: option (a) keep-frozen is the only ≤12-req slice; (b)/(c) are    
+  research-scale                                                              
+  and break CONST-P4 unless carefully staged. Deciding (a) early unblocks     
+  slice 6 cheaply.                                                            
+                                                                              
+  ### D. ua/env (slice 1) specifics                                           
+                                                                              
+  • There is **no common **ua.js — only desktop and touch forks (plus template
+  files).                                                                     
+  "Collapse into common + override deltas" means authoring a common           
+  implementation from                                                         
+  scratch while preserving two different export shapes (desktop: {browser,    
+  version,                                                                    
+  chrome/webkit/safari...}; touch: {ua, ios, iphone, ipad, android, bada, wp, 
+  support,                                                                    
+  landscape...} + mutable width/height/landscape updated on orientchange).    
+  • Touch ua detects dead browsers (Bada, Windows Phone, Presto win.opera,    
+  Flash plugins,                                                              
+  HTC Android 2.3) — capability replacement must first inventory real         
+  consumers (open Q2)                                                         
+  or it will faithfully preserve dead branches.                               
+                                                                              
+  ### E. Build/test touchpoints for wrapper removal (slice 8) — mechanical but
+  spread out                                                                  
+                                                                              
+  package.json (peerDependencies.jquery, devDependencies.jquery, exports),    
+  build/vite.config.js (rolldownOptions.external: ['jquery'], UMD globals —   
+  note the                                                                    
+  build still emits UMD, relevant to CONST-P2 phrasing),                      
+  build/vite.test.config.js                                                   
+  (optimizeDeps.include: ['jquery']), test/browser/entry.js (imports jquery   
+  directly                                                                    
+  and maps it into the modules shim). The PRD's slice list should name these  
+  or the "allowlist                                                           
+  = ∅" done-criteria won't actually produce a jquery-free artifact.           
+                                                                              
+  ## Observations                                                             
+                                                                              
+  • The stale test/dist/ harness (CJS, references non-existent                
+  jquery__event_type_*.spec.js files) should be deleted early; it currently   
+  pollutes                                                                    
+  greps and could mislead future slices' verification.                        
+  • vite-plugin-bem-levels parseEsModule computes isRedefinition but load()   
+  chains on entries.length > 1 alone (plugin lines ~610-617) — see Critical   
+  Gap 8.                                                                      
+  • CONST-P1's sdd-check greps *.deps.js for the string jquery; the           
+  allowlist's 9                                                               
+  entries match reality (verified all 9 exist; desktop has no ua.deps.js, so  
+  the count                                                                   
+  holds: dom, 4×i-bem-dom, idle, touch-ua, benchmarks, + i-bem-dom.deps.js).  
+  • i-bem-dom.js is exactly 1220 lines as the PRD states; inherit 121 lines.  
+  PRD's                                                                       
+  factual baseline is otherwise accurate.                                     
+  • The modules-shim test harness (test/browser/entry.js + modules-shim.js) is
+  a nice                                                                      
+  asset: spec files run unmodified under Vite; migrating events off jquery    
+  keeps this                                                                  
+  harness mostly intact (only the jquery mapping entry changes).              
+  • Mail/report hygiene: this report is the full deliverable for the          
+  feasibility leg;                                                            
+  ordering recommendations are consolidated in Critical Gaps 1-3 and          
+  Consideration A.                                                            
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  • **High** on file-level facts: all claims above verified by reading the    
+  cited files on                                                              
+  branch v5 (commit f2ab61e); pointer-file absence verified by filesystem     
+  search; tag                                                                 
+  absence verified via git; allowlist cross-checked against deps files.       
+  • **Medium-high** on semantic-risk analysis of the delegation engine (jQuery
+  behaviors                                                                   
+  cited from source; edge cases like focus/blur non-bubbling delegation and   
+  data-passing shapes would surface in implementation).                       
+  • **Medium** on effort sizing (slice count/≤12-req fit) — directional only. 
+  • **Overall**: PRD goals G1-G7 remain feasible; the plan needs (a) a slice-0
+  prerequisites item (v5-base tag, stale-harness purge), (b) slice 4 reworked,
+  (c) slice                                                                   
+  1/2 ordering revised around the touch-ua jquery dependency and the dom      
+  public-API                                                                  
+  question, (d) an explicit internal DOM-facade design gate before the events 
+  slice.                                                                      
+
+
+
+METADATA
+  coordinator: bem-core/opencode-1
+  review_id: arch-overhaul
+  review_leg: feasibility
+  review_phase: prd
+
+BLOCKS
+  ← ✓ bc-qc0: input convoy for bc-cj7 ● P2
+

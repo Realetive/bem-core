@@ -1,0 +1,428 @@
+# Design leg: data — module-graph & runtime-state data model for the v5 overhaul
+
+## Summary
+
+This leg designs the overhaul's data plane: what the dependency/layering data is, where
+each dataset lives (`.deps.js` manifests, plugin registry, platform entries, runtime
+registries, spec-harness bridge, migration ledgers), and how each evolves across the
+slice series S0–S7 into one coherent 6.0.0 (PRD Q9).
+
+Ground truth established by direct repo inspection (branch v5):
+
+1. **`.deps.js` is inert at build time.** `buildRegistry()` collects `deps: depsMap`
+   (`build/plugins/vite-plugin-bem-levels.js:421-449`) but neither `resolveId()` nor
+   `load()` ever consults it. Real module ordering is carried by two OTHER datasets:
+   per-file `bem:` ESM imports and the hand-authored ordered import lists in
+   `build/platforms/{desktop,touch}.js`. deps.js survives as (a) human-readable graph
+   documentation, (b) the grep substrate of the CONST-P1 ratchet
+   (`CONSTITUTION.md:24-39`), (c) plugin test fixtures.
+2. **The generateBarrel hazard is real and precisely located.** `parseEsModule()`
+   computes `isRedefinition` (`vite-plugin-bem-levels.js:185`) but
+   `buildRegistry`/`generateBarrel` (`:503-526`) never validate it: any same-named
+   module across levels is chained `_module = redef(_module)`; a value-exporting or
+   side-effect-only later entry TypeErrors at runtime while the build stays green.
+   The one live cross-level chain today (`jquery__config`) only works because
+   `desktop.blocks/jquery/__config/jquery__config.js` happens to be authored as
+   `export default function(base) { return base; }`.
+3. **"Init registry" (PRD OQ5) is three cooperating structures, not one.**
+   Hand-authored platform entry (what participates + side-effect order), build-time
+   `bem:` name resolution with generated barrels (where files live), and the runtime
+   `entities` object (`common.blocks/i-bem/i-bem.vanilla.js:26`) + `initFns` queue
+   (`:19`, `:627-633`) written by `declBlock`/`declElem` import side effects. The
+   dynamic-redefinition spec (`i-bem-dom.spec.js:1813`) works through `inherit.self`
+   live-class mutation + `entities` slot reuse (`i-bem.vanilla.js:160-165`), not
+   through module-value rebinding — which is why the ym monkey-patch was replaceable
+   by build-time barrels without losing that behavior.
+4. **Live collections are lazy-search + explicit invalidation, NOT MutationObserver.**
+   Five module-level Maps (`common.blocks/i-bem-dom/i-bem-dom.js:21-45`) plus
+   per-entity `_elemsCache`/`_elemCache`/`_findBackRefs` (`:349-363`). DOM mutation is
+   tracked only at the sanctioned mutation points (`bemDom.init/_destruct/update/
+   append/prepend/replace/before/after`); invalidation triggers are init waves
+   (`dropElemCacheQueue`), mod changes via `_findBackRefs` (`:698-701`), and destruct
+   (`:1064-1098`).
+5. **The spec harness is a hand-maintained data bridge.** `test/browser/entry.js:73-102`
+   pre-registers ESM block exports into a ym-compatible shim (`modules-shim.js`) that
+   the ym-authored specs (`modules.define('spec', [...deps], ...)`) resolve against.
+   The shim swallows factory errors (`modules-shim.js:52-55`), so the hard-coded
+   `>400` floor (`test/browser.spec.js:35`) is currently the ONLY tripwire against
+   silently-dropped spec registration.
+6. **Migration bookkeeping has the right artifacts but no parity contract.**
+   MIGRATION.md/MIGRATION.ru.md and CHANGELOG.md/CHANGELOG.ru.md are bilingual pairs;
+   the constitution allowlists are already machine-checked ledgers. Missing: a rule
+   that each slice updates both languages and both files coherently (ru-rot is the
+   review's flagged historical failure mode).
+
+## Key Considerations
+
+### D1. deps.js data model after jquery removal
+
+Facts:
+- The 9 CONST-P1 allowlist entries are `shouldDeps: 'jquery'` / `'jquery'` array
+  entries inside otherwise-meaningful manifests (e.g. `common.blocks/dom/dom.deps.js`,
+  `common.blocks/idle/idle.deps.js`, `touch.blocks/ua/ua.deps.js`,
+  `common.blocks/i-bem-dom/i-bem-dom.deps.js`).
+- The check's filter `grep -v -E '(^|/)jquery/'` hides every file under any `jquery/`
+  directory — including `desktop.blocks/jquery/__event/_type/…` and the wrapper's own
+  `jquery.deps.js` (review blind spot, confirmed at `CONSTITUTION.md:26`).
+- The test harness bypasses deps.js entirely and imports npm jquery directly
+  (`test/browser/entry.js:42`), which the deps grep can never see.
+- The schema actually implemented by the plugin: top-level keys `mustDeps`,
+  `shouldDeps`, `noDeps` only (`normalizeDeps`, `vite-plugin-bem-levels.js:231-255`);
+  entity references `string | {block, elem, elems, mod, mods, val}` with array
+  expansion (`expandBemEntity:318-386`). Two parallel converters exist with
+  divergent semantics: `bemEntityToModuleName` (`:280-312`) silently drops all but
+  the first value for `mods: {type: ['dom','bem']}` ("Return only the first for now")
+  while `expandBemEntity` handles arrays correctly. `bemEntityToModuleName` is
+  exported but unused — dead, divergent code.
+
+Design:
+- **Per-slice**: when a consumer migrates off jquery, its `jquery`/`'jquery'`
+  shouldDeps entry is deleted in the same commit. The benchmarks page
+  (`common.blocks/i-bem-dom/i-bem-dom.tests/benchmarks.blocks/page/page.deps.js`)
+  keeps its other deps (it stays as the perf harness per PRD Q6).
+- **Schema documented + linted, not extended**: document the allowed keys and entity
+  shapes as the deps format spec (one page in `common.docs/` or the design doc
+  glossary); add a mechanical check that (a) rejects unknown top-level keys,
+  (b) resolves every referenced entity to a module name that exists in the scanned
+  registry (the plugin api already exposes both datasets — the check is a ~40-line
+  node script reusing `buildRegistry`). Today nothing validates that deps references
+  point at real modules.
+- **CONST-P1 grep evolution** (three phases, each machine-checkable):
+  1. Now→S7: unchanged (allowlist shrinks 9→0 as slices land).
+  2. S7 (wrapper removal): allowlist must be empty AND the `(^|/)jquery/` carve-out
+     becomes moot because those directories are deleted; the check still greps only
+     `*.deps.js`.
+  3. Final form (the review's G1 predicate, as an sdd-check sketch):
+     ```bash
+     # no jquery in deps manifests
+     [ -z "$(grep -rl 'jquery' --include='*.deps.js' . 2>/dev/null \
+       | grep -v -E '(^|/)(node_modules|dist|\.git)/')" ]
+     # no jquery in sources or harness (bem:jquery virtual + bare npm import + require)
+     ! grep -rn -E "bem:jquery|from 'jquery'|from \"jquery\"|require\('jquery'\)" \
+       --include='*.js' common.blocks desktop.blocks touch.blocks build test
+     # wrapper/platform dirs gone
+     [ ! -d common.blocks/jquery ] && [ ! -d desktop.blocks/jquery ]
+     # package.json: peer dep and dev dep gone
+     ! grep -q '"jquery"' package.json
+     ```
+     (Docs/CHANGELOG prose mentions are excluded by scoping the grep to code globs.)
+
+### D2. Redefinition/layering data model + CONST-P3/P6 enforcement data
+
+Facts:
+- Registry key = module name derived from file path (`filePathToModuleName:197-204`),
+  value = entries sorted by `levelIndex` (`buildRegistry:413-419`); within a level the
+  order is `readdirSync` walk order — stable in practice but unspecified; barrels
+  should sort by path for determinism.
+- Chains in production today: `jquery__config` (common value + desktop identity
+  transformer), `page` (common + platform per platform), `ua` (platform-only, no
+  common ancestor — violates CONST-P3 spirit, grandfathered). Desktop-only
+  `jquery__event_type_winresize` is a standalone side-effect module (imports jquery+ua,
+  patches `$.event.special.resize`, re-exports `$`).
+- Hazard classes (all build-passing):
+  1. later entry exports a value → barrel call TypeError at import time;
+  2. later entry is side-effect-only (no default export) → same TypeError;
+  3. same-level duplicate names (e.g. `page.js` + `page.vanilla.js` in one level)
+     also chain — `filePathToModuleName` maps both to `page`;
+  4. standalone platform modules with no common base (ua today) — legal in the plugin,
+     illegal under CONST-P3, unenforced.
+
+Machine-checkable definition of "override" (the deliverable the review asked for):
+- **base** — entry at index 0 of a chain, or the single entry when no chain; may be a
+  value export, a side-effect module, or a transformer.
+- **transformer override** — entry at index ≥1 whose source matches
+  `export default function (<ident>[, …])` (extend `parseEsModule`'s regex to also
+  accept `export default (prev) =>` arrow form). Rule: **every entry at index ≥1 MUST
+  be a transformer**; violation = build error (plugin) + sdd-check (policy).
+- **side-effect refinement** — a no-default-export module; legal ONLY at index 0 of
+  its chain (its semantics are "execute", never "transform").
+- **standalone platform module** — a name whose entries all live in
+  desktop.blocks/touch.blocks with no common.blocks ancestor. Legal only if listed in
+  the CONST-P6 baseline allowlist.
+
+Enforcement data (two layers):
+1. **Plugin hard error (integrity)**: in `buildRegistry` (or `generateBarrel`), for
+   every chain validate `entries[i>0]` parse as transformers; throw with both file
+   paths in the message. Zero new configuration — pure validation of existing data.
+2. **CONST-P6 sdd-check (policy)** — ancestor existence with a shrinking baseline:
+   ```bash
+   # every platform JS module must have a common.blocks ancestor,
+   # unless on the shrinking baseline
+   PLAT=$(find desktop.blocks touch.blocks -name '*.js' \
+       ! -name '*.deps.js' ! -name '*.spec.js' ! -path '*tests*' | sort)
+   BASELINE="desktop.blocks/ua/ua.js
+   touch.blocks/ua/ua.js
+   desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.js"
+   BAD=""
+   for f in $PLAT; do
+     name=$(basename "$f" | sed 's/\.vanilla\.js$//; s/\.js$//')
+     [ -f "common.blocks/$(…path-mapped ancestor…)/$name.js" ] \
+       || { printf '%s\n' "$BASELINE" | grep -qx "$f" || BAD="$BAD $f"; }
+   done
+   [ -z "$BAD" ] || { echo "platform files without common ancestor: $BAD"; exit 1; }
+   ```
+   (Name-mapping from platform path to common path needs the block-dir structure; if
+   bash gets ugly, the fence may call a node script — the constitution permits bash
+   fences that invoke node from repo root, matching C3's "sdd-check style".)
+   Baseline lifecycle: `ua` entries die in S1 (env collapse), winresize dies in S2/S7
+   → baseline reaches ∅, matching the CONST-P1 ratchet culture: only migration slices
+   may shrink it.
+
+### D3. Init registry (PRD OQ5)
+
+Inventory of what "registration" means today:
+| Data | Where | Written by | Consumed by |
+|---|---|---|---|
+| participation + side-effect order | `build/platforms/{desktop,touch}.js` (hand list) | human | vite entry |
+| name→files resolution, barrels | plugin registry (`buildRegistry`) | scan | `resolveId`/`load` |
+| entity classes | `bem.entities` (i-bem.vanilla.js:26) | `declBlock/declElem` side effects | `getEntityCls` (i-bem-dom.js:144-151), specs |
+| deferred init callbacks | `initFns` array + `_runInitFns` (i-bem.vanilla.js:19,627) | constructors with `initImmediately=false` | `bemDom.init` flush |
+| once-per-class onInit | `_processInit` guard (i-bem-dom.js:796-810) | class machinery | init waves |
+| init trigger on DOM ready | `__init_auto` (8-line side-effect module; excluded in tests by entry.js:62 note) | — | — |
+
+The dynamic-redefinition parity path (i-bem-dom.spec.js:1813): second
+`modules.define(name, function(provide, Prev))` → second `declBlock` for the same
+entity name → `declEntity` sees `entityName === base[0].getEntityName()` →
+`inherit.self(base, …)._processInit(true)` mutates the live class in place
+(i-bem.vanilla.js:160-165) — every holder of the class reference (and the
+`entities` slot) sees the patch. In pure ESM this survives unchanged because the
+shared mutable datum is the class object + registry, not the module binding.
+
+### D4. Live collection/range model inside i-bem-dom (G5 decomposition)
+
+Store inventory (all in `common.blocks/i-bem-dom/i-bem-dom.js`):
+| Store | Line | Content | Invalidation |
+|---|---|---|---|
+| `uniqIdToEntity` | 27 | uniqId → live entity | destruct (last node), re-decl via inherit.self |
+| `uniqIdToDomElems` | 21 | uniqId → jQuery (pending multi-node accumulation during init wave) | consumed at entity construction (:138) |
+| `domElemToParams` | 39 | domNodeId → parsed `data-bem` params | `_destruct` (:1085) |
+| `domNodesToParents` | 33 | transient parent snapshots during destruct | cleared after wave (:1093) |
+| `destructingDomNodes` | 45 | re-entrancy guard during destruct | removed per wave (:1095-1097) |
+| `entity.domElem` | 342 | jQuery collection of the entity's nodes | `initEntity` `.add()` (:113-114), `removeDomNodeFromEntity` `.not()` (:227) |
+| `_elemsCache/_elemCache` | 349-356 | per-entity `{elem → {mod → results}}` | `_dropElemCache`, keyed invalidation via `_findBackRefs` on mod change (:698-701), init-wave queue |
+| `_findBackRefs` | 363 | back-pointers to finder entities | appended lazily at find time |
+
+Mutation tracking = **point events at the sanctioned mutation API** (init/destruct/
+update/append/prepend/replace/before/after — all funnel into `init` + `_destruct`).
+Nothing observes foreign DOM edits; external mutations require an explicit
+`bemDom.init(ctx)`/`destruct(ctx)` call. This contract must be preserved verbatim
+(CONST-P4/C4): a MutationObserver rewrite would change observable timing semantics
+and is out of scope.
+
+Lookup by block name/mods: `_findEntities` (`:601-639`) builds a CSS selector from
+entity name + mod postfix (`buildClassName`), runs jQuery `.find/.parents/.filter`,
+then lazily materializes entities per hit (`initEntity(..., ignoreLazyInit=true)`),
+dedup by `_uniqId`. "Live" = lazily re-queried with per-(elem,mod) caching — the
+native rewrite (S4/S5) swaps the selector engine for
+`querySelectorAll`/`closest`/`matches` and the jQuery collection in `domElem` for
+`Element[]`, which re-expresses `.add/.not/.index/.eq` usages at `:113-127`,
+`:223-228`, `:623-636` as array ops. `$.parseHTML(html, null, true)` at
+`getJqueryCollection` (`:284-288`) becomes `template`/`createHTMLDocument` parsing —
+the review's keepScripts parity trap.
+
+Decomposition seams (internal modules, invisible per CONST-P4):
+`params-store` (domNode→params), `entity-index` (uniqId→entity + pending domElems +
+getFromDom), `collection-cache` (elem caches + findBackRefs + invalidation policy),
+`dom-facade` (the mutation entry points — the ONLY sanctioned mutation path, which is
+what keeps the caches sound), `find-engine` (selector build + lazy materialization).
+
+### D5. Spec-harness migration as schema evolution
+
+Current schema: specs are ym-authored (`modules.define('spec', ['i-bem'], fn)` — 28
+files, 500+ cases); the bridge (`entry.js`) maps ESM export → ym module name by hand;
+absent from the map: `ua`, `idle`, `loader_type_bundle`, `keyboard__codes` (so no
+specs can exist for them); `jquery: $` is provided from npm (the P1 blind spot).
+The shim implements ym redefinition semantics (`define(name, factory)` receives prev
+value) and **logs-and-continues on factory throw** — a spec whose deps are missing
+contributes zero tests silently; the only global guard is the `>400` floor.
+
+Target state (per-slice ratchet):
+- Convert specs block-by-block as slices touch them. Conversion template (smallest
+  case `i-bem-dom__init.spec.js`):
+  ```js
+  // before (ym)
+  modules.define('spec', ['i-bem'], function(provide, bem) { describe(…); provide(); });
+  // after (ESM)
+  import bem from 'bem:i-bem';
+  describe('i-bem-dom__init', function() { … });
+  ```
+  `describe/it/before*` are already mocha globals on the page; the glob loader
+  (`entry.js:119`) needs no change. Multi-dep factories just become imports.
+- **Shim map as a ratchet dataset**: the pre-registered map starts at its current
+  ~24 entries; each slice either converts the block's specs (entry removed) or, for
+  newly testable blocks (env/ua in S1, idle in S2), adds the provision while its
+  specs are still ym-authored. Mirror CONST-P1: an sdd-check or plugin-test asserts
+  the map ⊆ a checked-in allowlist that only shrinks (except entries added by the
+  slice that introduces the block). Retirement criterion: zero
+  `modules.define` occurrences under `common.blocks/**/*.spec.js` → delete
+  `modules-shim.js` + the `'spec'` bootstrap; specs are then plain mocha ESM files.
+- **Gate policy**: replace the magic `>400` with per-file registration accounting:
+  entry.js counts `modules.define('spec', …)` invocations during glob load and
+  compares against the number of globbed spec files; any mismatch is reported via
+  `window.__testResults` and fails the Playwright run. Keep a loose liveness floor
+  (e.g. `total > 100`) to catch harness collapse, but the accounting check kills the
+  silent-drop class directly. Expected-total manifests (checked-in floor ratcheted
+  per slice) are the alternative if per-file accounting proves noisy.
+- `loader_type_bundle` provision is deleted with the block (PRD Q7); `keyboard__codes`
+  stays until a spec exists or the block's slice decides its fate; touch verification
+  arrives with the emulated touch Playwright project (Q8) + unpinning
+  `platform: 'desktop'` in `build/vite.test.config.js` (a per-project BEM_PLATFORM
+  env, matching the two-entry platform data already in the plugin).
+
+### D6. Migration bookkeeping (Q9 coherence)
+
+Artifacts and their per-slice contract:
+| Ledger | Files | Per-slice rule |
+|---|---|---|
+| Migration guide | MIGRATION.md + MIGRATION.ru.md | one `### <slice-id> <title>` section per slice, both languages in the SAME commit; content = data-model deltas (deleted modules, import renames, signature/type-contract changes, env field additions, gate policy) |
+| Changelog | CHANGELOG.md + CHANGELOG.ru.md | append under `## Unreleased`; human collapses to `## 6.0.0` at release |
+| Ratchet data | CONSTITUTION.md sdd-check fences | CONST-P1 allowlist (9→0), new CONST-P6 baseline (3→0), shim-map allowlist (→ infra-only), gate floors |
+| Version data | package.json | stays 5.0.0 through the series (Q9: no intermediate publishes); 6.0.0 bump + `repository.url` fix + tag in the final slice |
+
+The diffs of the rallowlists across the slice series ARE the machine-readable
+migration history — each slice's done-criteria name the exact entries it removes
+(C3). Add one cheap parity check (slice-0 deliverable): a bash fence asserting that
+any commit touching MIGRATION.md also touches MIGRATION.ru.md with a matching
+section header (same for the CHANGELOG pair) — prevents the ru-rot failure mode
+without new tooling.
+
+## Options Explored
+
+**D1 deps.js fate** — (a) keep as documented, schema-linted manifest, NOT a build
+input; (b) make the plugin consume deps.js to auto-order/generate platform entries;
+(c) delete deps.js entirely and re-base CONST-P1 on source-import greps.
+- (b) couples two data models that can diverge (deps.js says A→B, imports say B→A)
+  and re-introduces ym-era implicit ordering; (c) loses the human-readable graph and
+  the existing ratchet substrate, and forces a constitution rewrite mid-series.
+- **Choose (a)**: document the format (allowed keys, entity shapes, "not a build
+  input" warning), add the resolution lint, keep the grep ratchet.
+
+**D2 enforcement home** — (a) plugin hard error only; (b) constitution sdd-check
+only; (c) both. Plugin error catches integrity (broken barrels) at build time for
+everyone; sdd-check catches policy (override-only platforms) at done-gate time and
+carries the shrinking-baseline data. **Choose (c)** with different jobs: plugin =
+"chains must be transformer-form", sdd-check = "platform files need common
+ancestors, modulo baseline".
+
+**D3 init registry** — (a) status quo (hand-written platform entries + import side
+effects into `entities`); (b) explicit runtime registration API
+(`bemDom.register(Block)`); (c) generated platform entries from the scan registry +
+unchanged runtime semantics.
+- (b) adds a second registration path that must anyway keep `entities`-mutation for
+  spec-1813 parity — duplicate truth; (a) leaves the platform lists hand-synced with
+  the levels scan (already drifted: desktop-only winresize, touch-only `ua__dom`).
+- **Choose (c)**: `api.getRegistry()` (already exposed,
+  `vite-plugin-bem-levels.js:647-656`) + a small codegen emits the entry module per
+  platform; hand-maintained exclusion list for tests (`__init_auto`). Registered
+  data stays: entity name → class in `entities`; `lazyInit`, `onInit` as class
+  statics. No new registry shape; the barrel scan IS the registry.
+
+**D5 gate** — (a) keep magic 400; (b) checked-in expected-total manifest ratcheted
+per slice; (c) per-file registration accounting + loose floor. **Choose (c)** (b as
+fallback if accounting is noisy in practice).
+
+**D6** — per-slice bilingual sections under Unreleased (chosen) vs one big docs
+slice at the end (rejected: review's budget note — 1 REQ per slice is cheaper than
+a monolithic final docs slice and keeps parity checkable per merge).
+
+## Recommendation
+
+Consolidated data-plane decisions for the design doc:
+1. deps.js: documented manifest, schema+resolution lint, never a build input
+   (D1-a); CONST-P1 evolves per the three-phase sketch; final predicate is the
+   multi-grep sdd-check above.
+2. Override model: base/transformer/side-effect/standalone definitions adopted as
+   the glossary entries; plugin validates transformer-form for chain entries ≥1
+   (build error); new CONST-P6 ancestor-existence check with baseline
+   {desktop ua, touch ua, desktop winresize} shrinking to ∅ by S7 (D2).
+3. Init registry: generated platform entries from the scan registry; runtime
+   registration stays `decl*` side effects into `bem.entities`; dynamic
+   redefinition parity guaranteed by keeping `inherit.self` + `_processInit(true)`
+   path, pinned by i-bem-dom.spec.js:1813 (D3).
+4. i-bem-dom decomposition preserves the five Maps + per-entity caches as internal
+   modules (params-store / entity-index / collection-cache / dom-facade /
+   find-engine); sanctioned-mutation-point contract unchanged; `domElem` type
+   contract change to `Element[]` is the single ripple that touches every store
+   (D4).
+5. Spec harness: per-block ESM conversion in-slice; shim map becomes a ratcheted
+   allowlist; magic 400 replaced by registration accounting + loose floor; shim
+   deleted when zero `modules.define` remain in specs (D5).
+6. Bookkeeping: per-slice bilingual MIGRATION sections + Unreleased CHANGELOG
+   accumulation + ratchet allowlists as ledgers; parity fence added in S0; 6.0.0
+   collapse at the end (D6).
+
+## Constraints Identified
+
+- **C1/CONSTITUTION**: all new checks must be sdd-check-expressible (bash from repo
+  root) or plugin-internal; allowlist edits only in migration slices (P1 preamble).
+- **C4 parity**: `_findBackRefs` invalidation granularity, uniqId generation
+  (params.id preference + identify + wave id, `processParams:159-166`), destruct in
+  reverse document order, lazy materialization on find — all behavior-parity data
+  that must survive the native rewrite.
+- **CONST-P4**: `bemDom.scope/doc/win` are jQuery-typed public-ish surface (type
+  contract decision, PRD Q3); `$.fn.bem` dies with the wrapper (Q2: delete
+  outright); the internal Maps are already invisible.
+- **Plugin determinism**: within-level entry order should be sorted by path before
+  barrel generation (currently readdir walk order).
+- **Same-level duplicate names chain too** — the transformer-form validation must
+  treat them as chains (or the plugin should hard-error on same-level duplicates;
+  the validation covers both if applied to index ≥1 regardless of level).
+- **Test-harness jquery import** (`entry.js:42`) is outside every current grep —
+  S4/S5 must migrate specs' jquery usage or the final predicate grep fails.
+- **`test/dist/` stale harness** (CJS, references removed ENB packages + nonexistent
+  pointer specs) is data-model noise — purge in S0 (review next-steps #4).
+- **Dolt/tooling note (meta)**: bead writes during this leg were done via direct SQL
+  against the local server because `gc bd show --json` timed out (server degraded:
+  heavy list queries + failing remote sync) — flagged to witness, not a repo issue.
+
+## Open Questions
+
+1. Does anything outside the spec corpus rely on runtime re-declaration
+   (`inherit.self` path) — e.g. consumer apps monkey-patching blocks after import?
+   CONST-P5 fork assumes single consumer; the S0 API-pinning test should pin
+   `bem.entities` mutation as public-or-internal explicitly.
+2. deps.js fate sign-off (keep-as-docs recommended) — owner decision, since the
+   format is publicly documented upstream culture.
+3. CONST-P6 name-mapping in bash vs node helper — implementation detail for slice
+   specs; recommend the node script (`build/checks/platform-override.mjs`) invoked
+   from the fence.
+4. Should the shim-map ratchet live in CONSTITUTION.md (policy) or as a plugin-test
+   assertion (integrity)? Recommend constitution only if agents other than the slice
+   owner may edit entry.js.
+5. Gate accounting: count `modules.define('spec')` calls vs globbed files — verify
+   the redefinition form (a spec redefining 'spec' twice) doesn't double-count;
+   decide after a dry run in S1.
+6. `ua__dom` (touch-only, in the touch platform entry): folds into common env or
+   stays platform-only? Either way it's a CONST-P6 baseline entry until S1 decides.
+7. UMD dist format (`formats: ['es','umd']`, `build/vite.config.js:29`) —
+   CONST-P2 says no new UMD sources, but the dist artifact is build output; its fate
+   (and the `globals.jquery` external mapping) is unwired from this leg but dies
+   naturally with the wrapper in S7.
+
+## Integration Points
+
+- **S0** (prerequisites): v5-base tag; public-API inventory + pinning test (the
+  type-contract data every D4 store consumes); stale `test/dist/` purge; specs/
+  convention; repository.url fix; doc-parity fence; CONST-P6 skeleton with baseline.
+- **S1** (env/ua): creates common env base → CONST-P6 baseline loses both ua
+  entries; touch-emulated Playwright project + vite.test.config platform unpin;
+  shim map gains/converts ua; gate accounting lands here.
+- **S2** (periphery: dom, idle, benchmarks, winresize): dom fold-or-stay (OQ7)
+  decides the dom-facade naming; idle's deps.js jquery entry dies; winresize
+  deleted (no pointer code exists — review fix #1).
+- **S3** (loader): `loader_type_bundle` deleted (Q7) → platform entries, entry.js
+  shim map, and deps references all lose the entry; `loader_type_js` moves to
+  `import()` (no timeout semantics to preserve — bundle's 30s `LOADING_TIMEOUT`
+  is not in scope, loader_type_bundle.js:6).
+- **S4/S5** (events): pure-registry BEM events (Q10) — the containment-walk
+  registry replaces `$.event.special` data; parity traps (positional trigger args,
+  flags.fns dedup, cross-node propagation-stop) become spec data; the find-engine
+  seam from D4 is consumed here.
+- **S6** (inherit freeze, Q4=a): no data-model change; transformer-form remains the
+  only override authoring form (D2 definitions become normative).
+- **S7** (platform check + wrapper removal): CONST-P1 flips to the final zero-jquery
+  predicate; CONST-P6 baseline → ∅; shim map → infra-only; MIGRATION finalized;
+  6.0.0 + collapse of Unreleased changelog.
+
+Report complete. All file/line citations verified against the working tree
+(Realetive/bem-core, branch v5) on 2026-09-21.

@@ -1,0 +1,104 @@
+# Plan-review-1 · completeness
+
+review_id=arch-overhaul, review_phase=plan-review-1, leg=completeness
+Subject: `.designs/arch-overhaul/design-doc.md` (current text, post prd-align-1/2/3) slice plan S0–S6 + Implementation Plan, audited for execution-level completeness before create-beads.
+Repo evidence verified read-only @ f2ab61e (branch v5): package.json exports/engines/scripts; build/platforms/{desktop,touch}.js; ci.yml (5 jobs, node matrix [20,22]); playwright.config.js (single chromium, no projects array); test/browser/{entry.js,modules-shim.js,bemhtml-shim.js}, browser.spec.js:35 `toBeGreaterThan(400)`; touch.blocks/ua/ua.js:79 `$win.trigger('orientchange', …)`; block-level docs = 51 .md / 29 .ru.md under blocks (incl. ua, dom, idle, loader, jquery, jquery__config, i-bem-dom); MIGRATION(.ru)/CHANGELOG(.ru)/LICENSE.txt present; common.docs/{bem-core,bemjson,changelog,i-bem-js,migration}; build/plugins = vite-plugin-bem-levels{.js,.test.js}; test/dist/ exists.
+
+## Summary
+
+Requirement-level coverage (prd-align rounds 1–3) is genuinely tight, and most execution-level work is well owned: every slice-table outcome cell carries named verifiers, the TESTS checklist contract is concrete, the migration ledger discipline is a blanket per-slice rule, and rollback coherence is mostly by-construction (ratchet edits ride slice commits, Design position 6). But the audit found **4 [must-fix] and 7 [should-fix]** completeness defects that create-beads would materialize as holes:
+
+- **F1 (must-fix):** the staged final gates' auto-activation predicate ("once the allowlist reaches ∅") contradicts the plan's own arithmetic — allowlist is ∅ **after S5**, while the wrapper stays in the payload until S6's deletion commit (repo-verified: both platform entry lists import `bem:jquery` directly). As written, the no-jquery/CONST-P1 final assertions go binding — and red — between S5 and S6. This is a NEW S5→S6 boundary bug adjacent to, not a re-litigation of, prd-align-1 GA-F2 (which fixed S1–S5 staging).
+- **F2/F4 (must-fix):** three tooling artifacts the plan narrates — generated platform entries ("S0–S1 tooling"), the `.deps.js` schema+resolution lint, and the entity-converter unification — appear in no slice-table outcome cell, so create-beads schedules them nowhere; the keyboard__codes payload-parity assertion (OQ-6) hangs on an unowned REQ.
+- **F3 (must-fix):** block-level .md/.ru.md docs (51/29 files) are a doc surface the plan mutates in S1/S2/S3/S6 with no owner, no fence coverage, and no carrier for the NEW public `env` module's docs.
+- Should-fixes: plugin validation timing "(S0/S6)" ambiguous; doc-parity fence missing from CI wiring; exports-narrowing and orientchange-transport breaks lack named MIGRATION lines; bench v5-base baseline capture unscheduled; bundle-gate capped-artifact set unenumerated (barrel uncapped); S2's "S1 soft" edge missing from the Bead DAG line.
+
+## Completeness matrix (lens → coverage verdict → findings)
+
+| Lens | Verdict | Findings |
+|---|---|---|
+| 1. Setup | PARTIAL — assumed tooling mostly owned in-slice; 3 tooling items + 1 CI wiring gap unscheduled/ambiguous | F2, F4, F5, F6, F9 |
+| 2. Migrations | MOSTLY COMPLETE — 11 documented breaks walked; 9 have explicit owner+carrier; 2 breaks unnamed (narrowing, orientchange transport); page__icon hoist rides the blanket S6 MIGRATION section (acceptable; see note in Findings) | F7, F8 |
+| 3. Tests | STRONG — every outcome cell has named verifiers; Pinned-green/New/Deleted/Harness Δ contract concrete; two verifier-input gaps | F9, F10 |
+| 4. Docs | PARTIAL — README/MIGRATION/CHANGELOG/common.docs/jsdoc/package.json/LICENSE all owned; block-level docs unowned; fence not CI-wired | F3, F6 |
+| 5. Rollback/revert | MOSTLY COHERENT — per-commit ratchet coupling + skip/preview staging make slice reverts atomic; one boundary defect (also a revert hazard: reverting S6 under the ∅-trigger leaves gates binding with the wrapper restored → permanent red) | F1 |
+| 6. Hidden dependencies | MOSTLY DISPOSITIONED — api-pin test updates (S1 +env/ua; S6 jquery-rejects) and exports-map edits at S6 are named in Interface; shim-map entry timing has its S0 decision point (OQ-5); budget re-measure policy unstated | F1, F2, F5, F10 |
+
+## Findings
+
+### [must-fix] F1 — Staged final gates' activation predicate contradicts "∅ after S5"; CI goes red between S5 and S6
+- **Sections:** Executive Summary — "the no-jquery-in-artifact assertion and the jquery peer/dev-dep removal check **activate at S6**, when the CONST-P1 allowlist reaches ∅" AND, same summary, "**∅ after S5**, making S6 purely deletion"; Key Components 10 — "**activate at S6** (or auto-activate once the allowlist reaches ∅)… short-circuit to preview output + exit 0 **while the allowlist ≠ ∅**, binding otherwise"; Key Components 13 — "until the allowlist reaches ∅ and is conclusive (binding) at S6".
+- **Slices:** S5, S6 (predicate authored S0).
+- **Evidence:** the wrapper remains in the payload until S6's deletion commit — `build/platforms/desktop.js:30` and `build/platforms/touch.js:30` both `import 'bem:jquery'` directly, and D-8/KC 8 generation reproduces the hand lists; S5 only removes the last *consumers* (allowlist = ∅) while `common.blocks/jquery` and its entry imports survive to S6. Under the written guard ("allowlist ≠ ∅ → preview"), the gates flip to binding the moment S5 merges and immediately fail (jquery legitimately in artifact; "wrapper dirs gone" legitimately false) — S5→S6 CI red, breaking C2/G7, the exact failure class prd-align-1 GA-F2 eliminated for S1–S5. Revert hazard too: with an ∅-trigger, reverting S6 alone (wrapper restored, allowlist stays ∅) wedges every gate binding-red.
+- **Suggested fix:** change the activation predicate to **wrapper-block existence, not allowlist emptiness** — KC 10 + KC 13 guard form: "short-circuit to preview + exit 0 while `common.blocks/jquery` exists, binding once the wrapper dirs are gone (first binding-green commit = S6's deletion commit)"; Exec Summary parenthetical: "(activate when the wrapper block is deleted at S6 — the allowlist is already ∅ from S5)". Self-reverting by construction under slice revert.
+
+### [must-fix] F2 — Generated-entry machinery has no single owning slice ("S0–S1 tooling")
+- **Sections:** Key Components 8 — "Init registry (S0–S1 tooling) — platform entry modules **generated from the plugin's scan registry** (replacing hand-maintained ordered import lists)"; Open Questions 6 — "the **S0/S1 generation REQ** must either reproduce it (payload-parity assertion vs today's hand lists)"; Decision D-8.
+- **Slices:** S0 (recommended owner), S1.
+- **Evidence:** no slice-table outcome cell mentions entry generation; the S0 cell's "named-export barrel v1 (existing modules)" could be hand-written, and S1's cell never mentions it — yet create-beads consumes the slice table, and the keyboard__codes payload-parity assertion (KC 8, OQ-6, Non-Goal-frozen keyboard) attaches to a REQ that no slice carries. An engineer would discover mid-S0/S1 that nobody owns replacing `build/platforms/{desktop,touch}.js`.
+- **Suggested fix:** pin the owner — recommend S0 (it already owns the verification fence, specs/ convention, and needs the payload-parity assertion from day one). S0 outcome cell gains: "platform entries generated from the plugin scan registry (payload-parity assertion vs today's hand lists incl. `keyboard__codes`; hand lists deleted)". KC 8's tag "(S0–S1 tooling)" → "(S0)". OQ-6's "S0/S1 generation REQ" → "S0 generation REQ".
+
+### [must-fix] F3 — Block-level doc surface (51 .md / 29 .ru.md) has no owner; new public `env` module has no doc carrier
+- **Sections:** Implementation Plan TESTS checklist contract (four items, none docs); Key Components 13 — "Doc-parity fence (**MIGRATION/CHANGELOG** en↔ru section anchors) in S0"; S6 row (docs pass scoped to README bounded section + common.docs API pass only); Risks docs row (same scope).
+- **Slices:** S1 (env NEW public module; ua rewrite), S2 (dom/idle rewrite, winresize deletion), S3 (loader rewrite, `loader_type_bundle` deletion), S6 (jquery/__config/page elems deletions).
+- **Evidence:** repo has block-level docs next to the very blocks the plan rewrites/deletes: `common.blocks/ua/ua.{en,ru}.md`, `dom.*.md`, `idle.*.md`, `loader.*.md`, `jquery/jquery.{en,ru}.md`, `jquery/__config/jquery__config.ru.md`, `i-bem-dom.*.md` (51 .md / 29 .ru.md total). The plan names every other doc surface (README, MIGRATION, CHANGELOG, common.docs guides, jsdoc via the CI docs job, package.json, LICENSE) but never block mds; the fence covers MIGRATION/CHANGELOG anchors only. `env` is explicitly a NEW public module (Q5 exception) — shipping it with no doc requirement is a hole the S1 engineer hits, and stale ua.md would document removed fields.
+- **Suggested fix:** add item 5 to the TESTS checklist contract: "**Docs Δ** — block `.md`/`.ru.md` updated/deleted with the block; new public modules ship docs (en+ru)". Name carriers in slice cells: S1 "env docs + ua alias/removed-fields note"; S2/S3 "block docs ride the rewrite/deletion"; S6 "jquery/__config/page md deletions ride the deletions". Consider extending the S0 doc-parity fence scope to block-md en↔ru pairs at S0 spec-craft.
+
+### [must-fix] F4 — Data Model 1's deps-manifest lint + entity-converter unification are scheduled nowhere
+- **Sections:** Data Model 1 — "`.deps.js` stays a **documented manifest, never a build input** — schema+resolution lint added; the two divergent entity-converters unified (dead `bemEntityToModuleName` removed)".
+- **Slices:** S0 (recommended), else the F2-designated plugin slice.
+- **Evidence:** neither item appears in any slice-table outcome cell, TESTS entry, or CI wiring line; D-9's rationale ("wholesale deletion loses the ratchet substrate") presupposes the lint exists. Both are real engineering work with no carrier — exactly the "clearly needed but no slice carries it" class.
+- **Suggested fix:** S0 outcome cell gains: "`.deps.js` schema+resolution lint (manifest-not-build-input enforcement); entity-converter unification (`bemEntityToModuleName` removed, plugin-test covered)".
+
+### [should-fix] F5 — Plugin transformer-form validation timing ambiguous ("S0/S6")
+- **Sections:** Key Components 9 — "vite-plugin-bem-levels validation **(S0/S6)** — hard-error when a chain entry at index ≥1 is not transformer-form"; Risks — "Plugin transformer-form hard error (S0/S6)".
+- **Slices:** S0/S1/S6.
+- **Evidence:** "S0/S6" reads as introduce-at-S0, enforce-at-S6 — but the first override-heavy restructuring lands at S1 (common ua base + touch `__dom` delta). If the hard error only binds at S6, S1–S5 mis-authored overrides fail only at runtime — the High-risk row's own scenario, unguarded during the risk window.
+- **Suggested fix:** KC 9 + S0 row: "validation lands hard (build error naming both files) in S0, plugin tests as verifier (consistent with OQ-5's working position); S6 = final-state enforcement only". Or explicitly "warn at S0, hard error at S1" — pick one and write it into the cells.
+
+### [should-fix] F6 — Doc-parity fence created in S0 but not wired into CI
+- **Sections:** Key Components 13 — "Doc-parity fence (MIGRATION/CHANGELOG en↔ru section anchors) in S0"; Risks — "anchor-count check en↔ru **per commit**"; Implementation Plan CI wiring S0 sentence (lists bundle gate, api-pin, CONST-P6, CONST-P1 — not the fence).
+- **Slices:** S0.
+- **Evidence:** "per commit" enforcement with no named runner (no pre-commit hook is specified; husky/lint-staged exist but are not claimed by the plan) — the fence risks being a done-gate-only check that never runs again.
+- **Suggested fix:** CI wiring S0 sentence gains "doc-parity fence rides the `build` job from S0" (or the `lint` job).
+
+### [should-fix] F7 — Exports-map narrowing has no named MIGRATION line
+- **Sections:** Design position 2 — "The exports map narrows `"./*"` → `"./common.blocks/*"` (+ enumerated entries) in S0"; Design position 3 (enumerates only the root-export break: "S0's MIGRATION cell carries the line").
+- **Slices:** S0.
+- **Evidence:** current exports map is `"./*": "./*"` — today every root-relative path resolves (`desktop.blocks/…`, `touch.blocks/…`, `test/…`, `common.docs/…`); after narrowing they throw `ERR_PACKAGE_PATH_NOT_EXPORTED`. A C4-visible break with an owning slice but no named cell line — the doc's own pattern (position 3, CC-F2 fix) is to enumerate each break.
+- **Suggested fix:** Design position 3 (or S0 row): "S0's MIGRATION cell also carries the exports-narrowing line: root paths beyond the enumerated entries + `./common.blocks/*` no longer resolve."
+
+### [should-fix] F8 — orientchange transport change (jQuery synthetic → native CustomEvent) not enumerated as a break
+- **Sections:** Key Components 1 — "one native `resize` listener dispatching `CustomEvent('orientchange', {detail:{landscape,width,height}})` — firing guard **preserved**"; env/ua surface — "`orientchange` CustomEvent on window".
+- **Slices:** S1.
+- **Evidence:** today `touch.blocks/ua/ua.js:79` fires `$win.trigger('orientchange', {...})` — a jQuery synthetic event reaching only jQuery-bound handlers; a native `dispatchEvent` CustomEvent is invisible to `$(win).on('orientchange')` registrations, and the payload moves from the trigger args/Event object to `event.detail`. "Guard preserved" covers the firing heuristic, not the listener contract. In-repo consumer (`ua__dom`) is rewritten in-slice; external listeners (hard fork, single consumer — low impact) break silently. Undocumented in the plan's break inventory.
+- **Suggested fix:** KC 1 + S1 MIGRATION cell add the line: `$(win).on('orientchange', (e, data) => …)` → `window.addEventListener('orientchange', e => … e.detail.landscape …)`.
+
+### [should-fix] F9 — Bench v5-base baseline capture unscheduled
+- **Sections:** Key Components 11 — "ratio-to-v5-base thresholds ≤1.10×"; S2 row — "bench project B1–B6 on ratio thresholds".
+- **Slices:** S2.
+- **Evidence:** ratio thresholds require reference numbers from a build of tag `v5-base` captured on comparable runners, plus a storage home — no slice cell names the capture step, the artifact, or where the baselines live; without it B1–B6 (the S4/S5 done-gate) have no denominator.
+- **Suggested fix:** S2 outcome cell gains: "v5-base reference capture (build @ tag v5-base; record B1–B6 baseline numbers into the bench config/specs/); thresholds evaluated against it".
+
+### [should-fix] F10 — Bundle gate's capped-artifact set and re-measure policy unspecified
+- **Sections:** Key Components 10 — "`specs/bundle-budget.json` (gz-byte caps, measured+10% headroom today, final caps ~13 kB gz desktop / ~14 touch at S6)".
+- **Slices:** S0 (spec), S6 (final caps).
+- **Evidence:** caps are named for the desktop/touch payloads only; `dist/index.mjs` (the US1 import surface, gains env/ua at S1) is neither named as capped nor explicitly excluded — barrel bloat would be unguarded. Likewise nothing states whether per-slice re-measurement is required or forbidden (in fact the payload's composition is unchanged until S6's deletion — jquery rides the entries throughout, cf. F1 evidence — so S6 is the only necessary re-measure; say so).
+- **Suggested fix:** KC 10 + S0 spec-craft: "capped artifacts enumerated: `dist/{desktop,touch}/bem-core.mjs` + `dist/index.mjs` (or payloads-only with recorded rationale); caps re-measured only at S6 (mid-series composition unchanged while the wrapper remains in the payloads)".
+
+### [should-fix] F11 — S2's "S1 soft" dependency edge missing from the Bead DAG spec
+- **Sections:** Slice table S2 row — "Deps: **S0; S1 soft**"; Implementation Plan — "Bead DAG for create-beads: 7 slice convoys with deps `S0→{S1,S2,S3}`, `S2→S4→S5→S6`, `{S1,S3}→S6`".
+- **Slices:** S1, S2.
+- **Evidence:** create-beads consumes the DAG line; the S1→S2 soft edge exists only in the table — two different graphs depending on which text an implementer reads.
+- **Suggested fix:** add "(S1→S2 soft, non-blocking)" to the bead-DAG line, or drop "S1 soft" from the table — one source of truth.
+
+### Lens notes with no numbered finding
+- **Lens 1:** S0's "Node floor pinned" is a no-op — `engines: >=20` already @ f2ab61e and CI matrix [20,22] confirmed; harmless redundancy, optionally delete. S1's touch-emulated Playwright project and S2's bench project are properly owned (playwright.config.js currently has no `projects` array — clean extension point).
+- **Lens 2:** page__icon hoist-to-common rides the blanket S6 MIGRATION section; acceptable, but the S6 MIGRATION cell could name it (like conditional-comment's entry names both template files) since hoisting changes desktop payload composition.
+- **Lens 3:** D-6's "deleted-path negative tests land pre-narrowed" are not named in TESTS S0 New ("api-pin, bundle gate") — natural home is the api-pin test; tie by name at S0 spec-craft. All other outcome cells carry named verifiers (specs by path, closure predicates at S3, parity tests at S5, grep predicates at S6); ratchet maintenance (CONST-P1 allowlist per Design position 6; CONST-P6 baseline at S1/S2/S6 per KC 13; shim-map per TESTS Harness Δ + OQ-5 decision point) is scheduled.
+- **Lens 4:** jsdoc output regenerates via the existing CI `docs` job — automatic, no manual carrier needed (noted, no finding).
+- **Lens 6:** api-pin test maintenance across S1 (+env/ua) and S6 (jquery import rejects) is named in the Interface section; exports-map edits at S6 likewise — no findings; shim-map first-entry timing has its S0 decision point (OQ-5) — no finding.
+
+## Confidence
+
+High. F1 is repo-verified (entry lists import `bem:jquery`) and rests on an internal contradiction in the doc's own text; F2/F4 are textual absences verified against every slice-table cell, TESTS contract, and CI wiring line; F3 is repo-verified (doc inventory) against an exhaustively enumerated doc-surface list. Should-fixes are ambiguity grades where the work is acknowledged but weakly scheduled — each fix is a one-to-three-line design-doc edit. No finding re-litigates prd-align-1/2/3 dispositions; F1 is a distinct S5→S6 boundary defect adjacent to GA-F2's fixed S1–S5 staging.

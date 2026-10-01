@@ -1,0 +1,482 @@
+# Design exploration (arch-overhaul): api — public API shape, ergonomics, discoverability
+
+## Summary
+
+This leg specifies the concrete public API for bem-core v6: the export
+inventory (root named-export barrel + supported deep-imports + build-plugins
+subpath), the native DOM type contract (Element / Element[] rules replacing
+jQuery collections), the new `env` module surface scoped to the audited
+consumer inventory, the post-`import()` loader surface with its US6
+one-line migration, an API-pinning test as executable documentation that
+enforces CONST-P4, and the misuse error experience (deleted paths, deprecated
+`ua` fields, pre-DOM-ready access).
+
+Ground truth verified on repo @ v5: root export `.` = `dist/desktop/
+bem-core.mjs` built from `build/platforms/desktop.js` — a side-effect-only
+entry with **zero named bindings** (US1's `import { BemDom } from 'bem-core'`
+is indeed fictional today). `./*` wildcard makes every repo file
+deep-importable. `loader_type_js.js` contains no jquery import (it dies for
+ESM-direction reasons, not jquery reasons). `bem:ua` JS consumers are exactly
+two: `touch.blocks/ua/__dom/ua__dom.js` (the env inventory) and the dying
+`jquery__event_type_winresize.js`.
+
+All designs below stay inside the locked human decisions: Q2 (wrapper
+deleted, no shim), Q3 (root `.`, deep-imports `./*`, `./build/plugins/*`;
+blocks i-bem, i-bem-dom, events, dom, loader, ua/env; DOM contract =
+Element/Element[]), Q5 (env strictly by audited consumers, `ua` deprecated
+alias one release), Q7 (bundle deleted with bilingual note).
+
+## Key Considerations
+
+1. **Side-effect payload vs named API are two different products.** Today's
+   dist is a "drops in and auto-inits everything" payload (platform entry
+   imports jquery config, `__init_auto`, platform ua redefs). US1-style named
+   imports need the opposite: a platform-neutral, side-effect-light barrel.
+   Both must remain public; conflating them is the root cause of the current
+   "triple-undefined" API problem (PRD review §3).
+2. **The `./*` wildcard and "deep-imports stay public" (Q3) bound what the
+   API-pinning test can mechanically enforce.** The inventory can pin the
+   *supported* set and assert deletions fail, but it cannot make non-inventoried
+   deep imports unresolvable while the wildcard exists. The boundary is:
+   inventory + docs + review for "supported", ERR_PACKAGE_PATH_NOT_EXPORTED
+   only for paths outside the (narrowed) wildcard.
+3. **Name collisions at root.** `i-bem` and `i-bem-dom` both export
+   `Block`/`Elem` and `declBlock`/`declElem` (vanilla vs DOM-flavored). The
+   root barrel must pick one flavor per plain name and push the other to
+   deep-imports — not re-export both under invented prefixes.
+4. **jQuery collections are static; native replacements must define
+   single-vs-multi, order, dedup, and mutation semantics explicitly** or every
+   migrated signature becomes an argument. `domElem` is internally mutated
+   (`.add`/`.not` reassignment in `initEntity`/`removeDomNodeFromEntity`,
+   i-bem-dom.js:113–127, 227) — the public contract must be a snapshot, not a
+   live alias onto internal storage.
+5. **`$.parseHTML(html, null, true)` keepScripts parity** (getJqueryCollection,
+   i-bem-dom.js:284–288) is a real behavior: `update/append/...` with HTML
+   strings currently executes scripts. `DOMParser` and `<template>` do NOT
+   execute scripts; parity requires deliberate script re-creation or a
+   documented break.
+6. **env is greenfield authoring, not a refactor** (ua has no common JS
+   ancestor; desktop.blocks/ua/ua.js and touch.blocks/ua/ua.js are disjoint
+   fork files). The only JS consumer inventory: `ua__dom` reads
+   `ios, android, bada, wp, opera, chrome, screenSize, svg, landscape, width,
+   height` and *mutates* `width/height/landscape` on its own orientchange.
+   winresize (`ua.msie`) dies with winresize (Q5). Everything else in the old
+   ua objects (dpr, flash, video, connection, iphone/ipad, webkit/safari/msie)
+   has zero in-repo JS consumers.
+7. **`import()` is not `<script>` injection.** The legacy loader loads classic
+   scripts (global side effects); `import()` only succeeds for ES modules and
+   dedupes by URL via the module map. That semantic shift is THE parity trap
+   of the loader slice and must be the headline of the migration note.
+8. **`bemDom.scope/doc/win` are `null` until DOM ready** (i-bem-dom.js:938–950,
+   1214–1218) — a standing footgun. The native contract is the opportunity to
+   make this lazy instead of null.
+
+## Options Explored
+
+### A. Root export shape
+
+- **A1 — keep side-effect dist at `.` as-is.** Rejected: US1 named imports
+  stay fictional; the API stays undocumented-by-construction.
+- **A2 — single namespace default at root** (`import bem from 'bem-core'`;
+  `bem.dom.init()`, `bem.bemDom.declBlock()`). Rejected: default-only exports
+  are hostile to tree-shaking analysis and to the API-pinning test (keys not
+  statically enumerable at the export-statement level).
+- **A3 — named-export API barrel at `.`, side-effect payloads move to
+   documented deep-imports** (recommended, details in Recommendation).
+
+### B. Root naming for the i-bem / i-bem-dom collision
+
+- **B1 — plain names = DOM flavor** (`Block`, `Elem`, `declBlock`,
+  `declElem`, `declMixin`, `entities` from i-bem-dom's `bemDom` object +
+  `BemDomCollection`); vanilla-only authoring stays a deep-import
+  (`bem-core/common.blocks/i-bem/i-bem.vanilla.js`). Recommended: the DOM
+  layer is the overwhelmingly dominant authoring surface; two same-named
+  exports cannot coexist at root.
+- **B2 — prefixed vanilla names** (`VanillaBlock`, `bemDeclBlock`).
+  Rejected: invents new API surface (violates "no public API additions"
+  Non-Goal as amended by Q3/Q5).
+- **B3 — export the `bemDom`/`bem` module objects themselves as named
+  exports** (`export { default as bemDom }`, `default as bem`).
+  Recommended *as well* — cheap, preserves today's object shape for
+  minimal-diff migrations.
+
+### C. DOM type contract — `domElem` representation
+
+- **C1 — live array reference mutated in place.** Rejected: aliasing hazards,
+  impossible to cache safely.
+- **C2 — frozen Element[] snapshot behind a getter** (recommended): internal
+  storage stays private; `get domElem()` returns a frozen, document-ordered,
+  deduped array; contract says "treat as immutable snapshot, re-read after
+  entity gains/loses nodes". Matches jQuery static-collection semantics
+  closest.
+- **C3 — Set<Element>.** Rejected: not array-typed; breaks `.map/.forEach`
+  ergonomics consumers expect from Element[].
+
+### D. env computation model
+
+- **D1 — eagerly computed plain object** (current ua style). Rejected:
+  module-eval-time DOM reads are the SSR/module-eval-order hazard the PRD
+  wants out; also forces the mutate-on-event hack.
+- **D2 — lazy memoized getters for immutable facts (platform/browser/
+  screenSize/svg), live getters for viewport-dependent facts (width/height/
+  landscape), change signal as a native CustomEvent('orientchange') on
+  window** (recommended). Consumers like `ua__dom` get update notification
+  through the same `_domEvents(bemDom.win)` path they use today.
+- **D3 — env as an events.Emitter instance with subscription methods.**
+  Rejected for the change signal: duplicates the events system and misses the
+  free integration with `_domEvents(win)`; env stays a plain object (getters),
+  matching how `ua` is consumed today.
+
+### E. `ua` deprecation-alias mechanics
+
+- **E1 — plain object snapshot mapping legacy names, no warnings.** Rejected:
+  silent undefined reads are the worst failure mode ("why is my ua.msie
+  branch dead").
+- **E2 — Proxy over env: removed fields warn via console.warn once per field
+  and return undefined; live fields forward to env getters; set attempts warn
+  once and no-op** (recommended; details below).
+- **E3 — getters that throw on removed fields.** Rejected: too hot for a
+  one-release compat alias; breaks page load for legacy consumers instead of
+  nudging them.
+
+### F. Loader surface after Q7 (bundle deleted) + import() reimplementation
+
+- **F1 — keep legacy callable exactly: `loader(url, success?, error?)`,
+  reimplemented as `import(url).then(() => success?.(), () => error?.())`,
+  also returning the promise** (recommended — zero-diff for callback users,
+  promise for new code, and the US6 migration line is literally
+  `import(url)`).
+- **F2 — promise-only `get(url)`** (drop callbacks). Acceptable but breaks
+  every existing call site for no gain over F1's promise return.
+- **F3 — delete the loader block; "the loader is import()"**. Rejected: US6
+  permits it only if migration is one line, but F1 keeps compat AND provides
+  the migration path; deleting a public block (Q3 lists loader as public)
+  needs a stronger reason than taste.
+
+### G. Discoverability mechanism
+
+- **G1 — API-pinning test as executable documentation** (`test/api.spec.js`,
+  node --test, no browser): asserts (1) exact key set of the root barrel,
+  (2) default-export type of every supported deep-import, (3) exports-map
+  entries exist on disk, (4) deleted paths fail to import. The pinned list is
+  the single file a CONST-P4 change must touch — reviewer-visible by
+  construction. Recommended as the primary mechanism.
+- **G2 — hand-maintained docs table (API.md/API.ru.md).** Recommended as the
+  human layer, generated-or-synced from the pinned list (bilingual per the
+  review's doc-parity finding).
+- **G3 — JSDoc only.** Kept as the per-symbol layer (jsdoc already wired:
+  `npm run docs`), but not a boundary: nothing fails when docs and reality
+  drift.
+
+## Recommendation
+
+### 1. Export inventory (the slice-0 deliverable content)
+
+**package.json exports (target state after S7):**
+
+```jsonc
+"exports": {
+  ".": "./dist/index.mjs",                      // NEW: named-export API barrel
+  "./dist/desktop": "./dist/desktop/bem-core.mjs",  // side-effect payload
+  "./dist/touch":   "./dist/touch/bem-core.mjs",    // side-effect payload
+  "./build/plugins/*": "./build/plugins/*",
+  "./common.blocks/*": "./common.blocks/*",     // narrowed from "./*"
+}
+```
+
+The `"./*"` → `"./common.blocks/*"` narrowing (lands S0) keeps the Q3
+"deep-imports stay public" contract verbatim — all existing public
+deep-imports ARE `common.blocks/...` paths — while making `build/`,
+`test/`, `dist/` internals, and config files unresolvable
+(ERR_PACKAGE_PATH_NOT_EXPORTED in Node; unresolved-import at build time in
+Vite). That is the misuse error experience for non-public paths: loud, early,
+with a stable error code to grep for.
+
+**Root barrel (`build/api.js` → built `dist/index.mjs`), platform-neutral:**
+
+```js
+// DOM authoring surface (plain names = DOM flavor, per B1)
+export { default as bemDom } from 'bem:i-bem-dom';
+// bemDom: { Block, Elem, declBlock, declElem, declMixin, entities,
+//           isEntity, init, destruct, detach, update, replace, append,
+//           prepend, before, after, getFromDom, initOnDom,
+//           scope, doc, win }
+export { default as BemDomCollection } from 'bem:i-bem-dom__collection';
+export { default as dom } from 'bem:dom';
+export { Emitter, Event } from 'bem:events';          // named exports of events.vanilla.js:530? — events default is { Emitter, Event }; re-export both names
+export { default as channels } from 'bem:events__channels';
+export { default as loader } from 'bem:loader_type_js';   // see §4; callable
+export { default as env } from 'bem:env';                 // NEW (Q5 exception)
+export { default as ua } from 'bem:ua';                   // deprecated alias, one release
+```
+
+`import { bemDom, env } from 'bem-core'` becomes real. The barrel must NOT
+pull `__init_auto` or platform ua redefs — importing the root API never
+auto-inits; auto-init is the payload product's job
+(`import 'bem-core/dist/desktop'`). This is also the minimum viable
+tree-shaking posture: scope US1 to "no jQuery in bundle" per the review, and
+leave `"sideEffects"` field tuning as a post-overhaul follow-up.
+
+**Supported deep-import set (the pinned inventory, Q3 blocks only):**
+
+| Block | Files (under `bem-core/common.blocks/`) |
+|---|---|
+| i-bem | `i-bem/i-bem.vanilla.js`, `i-bem/__internal/i-bem__internal.vanilla.js`, `i-bem/__collection/i-bem__collection.js` |
+| i-bem-dom | `i-bem-dom/i-bem-dom.js`, `__collection/…__collection.js`, `__events/i-bem-dom__events.js`, `__events/_type/…_type_dom.js`, `__events/_type/…_type_bem.js`, `__init/i-bem-dom__init.js`, `__init/_auto/…_init_auto.js` |
+| events | `events/events.vanilla.js`, `__channels/events__channels.vanilla.js`, `__observable/events__observable.js`, `__observable/_type/events__observable_type_bem-dom.js` |
+| dom | `dom/dom.js` |
+| loader | `loader/_type/loader_type_js.js` (kept as deprecated re-export after the file moves to `loader/loader.js`) |
+| env / ua | `env/env.js` (new), `ua/ua.js` (alias, new common-level file) |
+
+`jquery` deep-imports vanish when the wrapper is deleted (S7) — the pinning
+test asserts the import then REJECTS.
+
+**`./build/plugins/*`:** the API is the default export of
+`build/plugins/vite-plugin-bem-levels.js`: `bemLevels({ platform,
+levels: { [name]: string[] }, rootDir? }) → Vite Plugin` (verified signature
+at vite-plugin-bem-levels.js:547–563). Document options in
+`build/plugins/README.md` (+ .ru.md); add the default-export shape to the
+pinning test. The `.test.js` sibling stays internal.
+
+### 2. Native DOM type contract (Element / Element[])
+
+**Contract statement (goes verbatim into the design doc and API.md):**
+
+> Public DOM-typed values are native `Element` (single) or `Element[]`
+> (multi). Multi values are plain arrays in document order, deduplicated,
+> **static snapshots** — treat as immutable; re-read after DOM changes.
+> There are no live collections in the public API. `document` and `window`
+> pass through as native objects.
+
+Signature-by-signature migration table (source: i-bem-dom.js, dom.js):
+
+| API (today, jQuery-typed) | v6 contract |
+|---|---|
+| `entity.domElem : jQuery` | `get domElem() : Element[]` frozen snapshot (C2); internal storage private |
+| `bemDom.scope/doc/win : jQuery` | lazy getters → `Element (body)`, `Document`, `Window`; never null after import (see §6) |
+| `bemDom.init(ctx: jQuery\|string)` | `init(ctx?: Element \| Element[] \| string): Element[]` — selector-string support retained (returns matched roots); default ctx = scope |
+| `bemDom.destruct/detach(ctx, excludeSelf)` | `ctx: Element \| Element[]` |
+| `bemDom.update/replace/append/prepend/before/after(ctx, content)` | `ctx: Element \| Element[]`; `content: string(html) \| Element \| Element[] \| BemDomEntity`; returns `Element[]` (the inserted nodes) |
+| `entity.update/append/prepend/before/after(content)` | same content/return contract |
+| `dom.getFocused(): jQuery` | `getFocused(): Element` — literally `document.activeElement` |
+| `dom.contains(ctx, domElem)` | `contains(ctx: Element \| Element[], domElem: Element \| Element[]): boolean` — any-node-in-any-root semantics (`node.closest` walk + membership) |
+| `dom.containsFocus(domElem)` | unchanged shape, Element[] in |
+| `dom.isFocusable/isEditable(domElem)` | accept `Element` (single; current code already only looks at `[0]`) |
+| `bemDom.getFromDom(domNode, Entity)` | already native `Element` — unchanged |
+| `bemDom.initOnDom(domNode, Entity, params)` | `Element` only (jQuery branch dropped) |
+| `$(node).bem(Block, params)` (plugin) | DELETED (Q2). Migration: `bemDom.initOnDom(node, Block, params)` — document in MIGRATION.md next to the wrapper removal |
+| `e.bemTarget` (events_type_dom.js:32) | `BemDomEntity \| null` — built via `getEntityFromDom`, not the plugin |
+
+**HTML-string content parity:** `update/append/...` with a string currently
+goes through `$.parseHTML(html, null, true)` — scripts EXECUTE. v6 keeps this
+observable behavior (behavior parity default, C4) via `<template>` parsing +
+re-created script elements (template parsing alone never executes scripts).
+Spec this as an explicit test; flag the alternative (drop keepScripts,
+document the break) as a CONST-P4 decision the events-slice spec must make
+consciously — recommendation: keep parity.
+
+`BemDomCollection` (entity collections) is untouched by the type contract —
+it collects entities, not DOM nodes.
+
+### 3. `env` module (common.blocks/env/env.js — new public module)
+
+Scoped strictly to the audited inventory (Q5):
+
+```js
+// env/env.js
+let orientationSubscribersBound = false;   // see orientchange below
+export default {
+    get ua()        { return navigator.userAgent },          // diagnostic only
+    get platform()  { return ios() ? 'ios' : android() ? 'android' : 'other' },
+    get ios()       { /* memoized version string or undefined */ },
+    get android()   { /* memoized version string or undefined */ },
+    get browser()   { /* 'opera' | 'chrome' | '' — touch legacy keys */ },
+    get screenSize(){ /* 'large' | 'normal' | 'small' — memoized */ },
+    get svg()       { /* memoized boolean (createSVGRect probe) */ },
+    get width()     { return window.innerWidth },   // LIVE getters —
+    get height()    { return window.innerHeight },  // no stale cache,
+    get landscape() { return window.innerWidth > window.innerHeight } // no mutation hack
+}
+```
+
+- Immutable facts (platform/ios/android/browser/screenSize/svg): lazy,
+  memoized on first read (D2). No DOM-read at module-eval time → no import-
+  order hazard, SSR-friendly module graph.
+- Viewport facts: live getters. This deletes the current bug-shaped pattern
+  where `ua.width/height/landscape` are frozen at module init and only
+  updated by `ua__dom` mutating the exported object (touch.blocks/ua/ua.js:
+  69–88, ua__dom.js:35–37).
+- **orientchange:** env owns a native `resize` listener on window (keeping
+  the Android soft-keyboard width-guard heuristic from touch ua.js:78), and
+  on real orientation change dispatches
+  `window.dispatchEvent(new CustomEvent('orientchange', { detail: { landscape,
+  width, height } }))`. `ua__dom` then migrates from jQuery
+  `$win.trigger('orientchange', …)` to the identical `_domEvents(bemDom.win)
+  .on('orientchange', …)` handler it already has — zero new subscription API.
+- Dropped from the old ua objects because zero JS consumers exist: `msie`,
+  `webkit`, `safari`, `mozilla`, `dpr`, `flash`, `video`, `connection`,
+  `iphone`, `ipad`, `bada`, `wp`, `ua` (raw string stays as diagnostic),
+  `screenSize` thresholds stay 320px-based for parity. RTL / passive
+  listeners / input modality: Non-Goals per Q5 ("added when a consumer
+  exists").
+- desktop.blocks/ua and touch.blocks/ua JS files are deleted; the platform
+  forks collapse to common env + the touch-only `ua__dom` block (which is
+  itself an override-shaped consumer, satisfying CONST-P3).
+
+**`ua` deprecated alias (common.blocks/ua/ua.js — new file, one release):**
+
+```js
+import env from 'bem:env';
+const warned = new Set();
+const warn = (f) => { if (!warned.has(f)) { warned.add(f);
+    console.warn(`[bem-core] ua.${f} is removed in v6; see env / MIGRATION.md`) } };
+export default new Proxy({}, {
+    get(_, field) {
+        if (field in env) return env[field];           // live forwarding
+        warn(String(field)); return undefined;         // msie, dpr, flash, …
+    },
+    set(_, field) { warn(String(field) + ' (assignment)'); return true } // no-op
+});
+```
+
+Mechanics answers: console.warn **once per field** (module-level Set — not
+once per read), removed fields return `undefined` (never throw), writes warn
+once and no-op (the old internal mutator `ua.width = …` dies with ua__dom's
+migration anyway). Removal schedule: ships in 6.0.0, deleted in the next
+major; stated in MIGRATION.md + the warn text.
+
+### 4. Loader surface (S3)
+
+```js
+// loader/loader.js (moved from _type/loader_type_js.js; old path keeps a
+// deprecated re-export default for deep-import compat)
+export default function loader(url, success, error) {
+    return import(/* @vite-ignore */ url)
+        .then(m => { success?.(); return m })
+        .catch(e => { error?.(e); throw e });   // rethrow: promise users see it
+}
+```
+
+- Public surface: callable `loader(url, success?, error?)` returning the
+  module-namespace promise. `import()` dedupes concurrent/ repeat loads by
+  URL (the legacy `loading`/`loaded` Maps become unnecessary) and reports
+  errors natively — the legacy semantics minus the hand-rolled bookkeeping.
+- **US6 migration story (one line, goes in MIGRATION.md en+ru):**
+  `loader_type_js.get(url)` → `import(url)` — or keep zero-diff callback
+  shape via `loader(url, success, error)`.
+- **Documented semantic shift (the slice's parity trap):** the loader now
+  loads **ES modules only**; classic scripts defining globals no longer
+  execute (import() refuses non-module scripts). Consumers of classic
+  scripts must migrate the script to ESM. `loader_type_bundle` deletion
+  (Q7) documented in the same bilingual note.
+
+### 5. Discoverability (ergonomics)
+
+- **Primary: API-pinning test** `test/api.spec.js` (node --test, wired into
+  `npm test`): exact-keys assertion on the root barrel; default-export type
+  per supported deep-import; exports-map→disk existence; negative assertions
+  (deleted paths reject). The pinned arrays are THE inventory — a CONST-P4
+  change cannot land without editing this file, which is the point.
+- **Human layer:** `API.md` / `API.ru.md` table (export → module → type →
+  since), synced from the pinned list; budget 1 REQ per slice per the
+  review's bilingual-parity finding.
+- **JSDoc:** per-symbol docs stay (`npm run docs` exists); `@module` names
+  must match the inventory — lintable later, not this overhaul.
+- CONST-P4 shows up in exactly two places in the api test: (a) the exact-keys
+  list (additions are PR-visible; "no public API additions" is enforced by
+  review of that diff), (b) the deleted-path negative assertions (shrink
+  without migration doc = red build + MIGRATION.md grep in slice spec).
+
+### 6. Error experience for misuse
+
+| Misuse | Experience |
+|---|---|
+| Import non-public path (e.g. old `…/jquery/jquery.js` after S7, or `bem-core/build/vite.config.js`) | Node: `ERR_PACKAGE_PATH_NOT_EXPORTED`; Vite: unresolved-import at build time. Early, greppable, documented in API.md. |
+| Read removed `ua` field (`ua.msie`) | `undefined` + `console.warn` once per field with migration pointer (E2). Never a throw. |
+| Assign to `ua` field | warn once, no-op. |
+| env read before DOM ready | Works — all facts are lazy getters with no DOM-eval-order dependency; viewport facts read `window` live. env has no ready-state at all. |
+| `bemDom.init()` before body exists | `bemDom.scope/doc/win` become lazy getters (body/document/window resolved on first access, refreshed by DOMContentLoaded) — never `null`. If body genuinely absent: explicit `throw new Error('bem-core: DOM is not ready')` instead of silent no-op (today's null-scope failure is undebuggable). |
+| `loader(url, …)` on a classic (non-ESM) script | import() rejection → `error?.(e)` + promise rejection; message supplemented by the MIGRATION note. |
+
+## Constraints Identified
+
+- **CONST-P4 is the load-bearing wall of this leg**: every signature change
+  above needs a MIGRATION.md (en+ru) entry inside its slice; the api test is
+  the mechanical tripwire, review of the pinned-list diff is the policy.
+- **Q3's "deep-imports stay public" + `./*` wildcard**: the pinning test
+  cannot make non-inventoried `common.blocks/*` imports fail; only path
+  deletion or wildcard narrowing produces mechanical enforcement. Narrowing
+  to `./common.blocks/*` is itself an exports-map change that must be listed
+  as a documented migration in S0.
+- **No public API additions (Non-Goal, amended only by Q5's env exception)**:
+  the root barrel must not invent prefixed/renamed exports (rules out B2);
+  it exposes existing module shapes under their existing names.
+- **Behavior parity default (C4)** with v5-base anchor (Q1: tag at 7a9e932,
+  created in slice-0): keepScripts parsing, orientchange payload shape,
+  screenSize thresholds, loader dedupe behavior are parity commitments the
+  spec harness must cover (existing corpus: i-bem-dom.spec.js 1854 L,
+  events_type_dom 1069 L, events_type_bem 1013 L — build the contract tests
+  against it).
+- **US1 scoped to "no jQuery in bundle"** (review §Important): the API barrel
+  must not regress this; full tree-shaking is explicitly out of scope.
+- **Touch verification gap (Q8)**: env/`orientchange` behavior is
+  touch-platform; slice-1 acceptance needs the touch-emulated Playwright
+  project — the env API design above is deliberately testable on an emulated
+  device (getters + one CustomEvent).
+- **Versioning (Q9):** one 6.0.0 release; the ua alias's "one release" =
+  the 6.x series; `repository.url` fix rides in slice-0 with the exports-map
+  narrowing.
+
+## Open Questions
+
+1. **Vanilla `i-bem` authoring at root** — confirm B1 (plain names = DOM
+   flavor; vanilla reachable only via deep-import). Alternatives rejected on
+   "no new API" grounds, but the choice is a doc-visibility tradeoff.
+2. **keepScripts parity for HTML strings** — recommend keep (C4 default);
+   the events slice (S4/S5) spec must ratify or document the break, since
+   the delegation/init engine owns the implementation.
+3. **Frozen `domElem` arrays** — confirm C2 (frozen snapshot + re-read
+   contract) vs unfrozen snapshots; frozen catches consumer mutation bugs
+   early but is a behavior change for anyone mutating (rare, undocumented).
+4. **Exports-map narrowing timing** — S0 (with repository.url fix) or S7
+   (with wrapper deletion)? Recommend S0: earliest mechanical boundary, and
+   the deleted-jquery negative test then lands already-narrowed.
+5. **`env.browser` legacy keys** — keep `opera`/`chrome` string keys (as
+   consumed by ua__dom's `browser` modifier) or push ua__dom to
+   `env.platform`-only modifiers and delete `browser`? Recommend keeping
+   both keys for one release (parity), delete with the ua alias.
+6. **orientchange CustomEvent payload** — `{ landscape, width, height }` in
+   `detail` matches the current jQuery trigger data; confirm no consumer
+   relies on the jQuery event *object* shape beyond these fields.
+7. **Loader old-path re-export lifetime** — deprecated re-export at
+   `loader/_type/loader_type_js.js`: same one-release schedule as `ua`, or
+   delete immediately (deep-import compat says keep one release)?
+
+## Integration Points
+
+- **Slice-0 (S0):** this leg's export inventory + the API-pinning test
+  skeleton + exports-map narrowing + repository.url fix. Deliverables named
+  in PRD review Next Steps #4.
+- **Slice-1 (S1 env/ua):** lands `env/env.js`, the `ua` Proxy alias,
+  deletion of desktop/touch ua JS forks, ua__dom migration to env +
+  CustomEvent orientchange; api test gains env/ua entries; touch-emulated
+  Playwright project (Q8) covers env.
+- **Slice-2 (S2 periphery):** `dom` block signatures migrate to the DOM type
+  contract table above; `idle` moves off jQuery events (its public Emitter
+  shape is unaffected).
+- **Slice-3 (S3 loader):** loader moves + re-export shim + bilingual
+  migration note (with bundle deletion per Q7).
+- **Slices-4/5 (S4/S5 events core + bem-type events):** own the delegation
+  engine that must satisfy `e.bemTarget: BemDomEntity|null`, keepScripts
+  parsing, and the `_domEvents(ctx)` context contract (Element/Entity/
+  BemDomCollection/document/window); their specs consume this leg's type
+  contract verbatim.
+- **Slice-7 (S7):** wrapper deletion (MIGRATION entry for `$(node).bem()`
+  → `initOnDom`), jquery peer-dep removal, final api-test negative
+  assertions for all deleted paths, allowlist = ∅.
+- **Other design legs:** the DOM-facade/event-facade internal contract
+  (review suggestion, feasibility leg) consumes this leg's public type
+  contract as its boundary condition; the platform-leg (CONST-P3) inherits
+  env/ua__dom as the worked example of override-shaped platform code.
+- **docs:** API.md/API.ru.md + MIGRATION.md/MIGRATION.ru.md entries per
+  slice; jsdoc `@module` alignment.
