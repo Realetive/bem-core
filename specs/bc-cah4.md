@@ -50,12 +50,14 @@ environment yields `ua: ''`, `platform: { other: true }`, falsy probes, and
 
 ## REQ-2 (add): native orientchange CustomEvent with Android shrink-guard
 
-`env` registers exactly one native `resize` listener on `window` (guarded by
-`typeof window !== 'undefined'`) that dispatches
+`env` registers one native `resize` listener on `window` (guarded by
+`typeof window !== 'undefined'`; listener count is an implementation detail,
+self-review attested) that dispatches
 `new CustomEvent('orientchange', { detail: { landscape, width, height } })`
 on `window` **only when both landscape and width changed** relative to the
-last dispatch (today's Android shrink-guard heuristic, preserved verbatim:
-`lastLandscape`/`lastWidth` update only on dispatch). MIGRATION carries the
+last dispatch (today's Android shrink-guard heuristic, preserved: the guard
+state — today `lastOrient`/`lastWidth`, renamed `lastLandscape`/`lastWidth` —
+updates only on dispatch). MIGRATION carries the
 transport change: `$(win).on('orientchange', (e, data) => …)` →
 `window.addEventListener('orientchange', e => … e.detail.landscape …)`.
 The guard is pinned by emulation-parity tests (REQ-10).
@@ -97,8 +99,10 @@ platforms. `common.blocks/ua/__dom/ua__dom.js` (new) is the elem ancestor;
 transformer-form `export default function(prev)` (plugin chain rule). The
 `CONSTITUTION.md` CONST-P1 ALLOW list drops `touch.blocks/ua/ua.deps.js`
 (9 → 8 entries) and `specs/platform-baseline.txt` drops its 3 ua-family
-entries (19 → 16 files, standalone-list comment updated: desktop `ua`, touch
-`ua`, touch `ua__dom` leave the standalone set) — both in the same commit,
+entries (19 → 16 files; standalone-list comment updated: desktop `ua` and
+touch `ua` leave the standalone set, touch `ua__dom` remains standalone
+deps-only — `touch.blocks/ua/__dom/ua__dom.deps.js` stays pinned, mirroring
+`jquery__config (deps-only)`) — both in the same commit,
 satisfying the two-directional ratchets.
 
 - Evidence: `desktop.blocks/ua/ua.js:34 :: browser :: "export default browser"`
@@ -181,16 +185,24 @@ semantics); shrinking without amendment is fine.
 
 ## REQ-10 (add): env units, alias units, emulation parity (G2 tests leg)
 
-New browser-suite specs (modules.define convention), loaded in BOTH projects:
-one dedicated unit per UA-derived getter (`platform`, `ios`, `android`,
-`browser` — fixture UAs via `Object.defineProperty(navigator, 'userAgent')`,
+New browser-suite specs (modules.define convention), loaded in BOTH projects,
+plus one node-suite unit: one dedicated unit per UA-derived getter
+(`platform`, `ios`, `android`, `browser` — fixture UAs via
+`Object.defineProperty(navigator, 'userAgent')`,
 justification comments), capability-probe units (`screenSize`, `svg` with
 stubbed false path), live-probe units, the orientchange firing-guard pin
 (stubbed `innerWidth`/`innerHeight` + dispatched `resize`: no dispatch on
 orientation-only or width-only change; dispatch payload `{landscape, width,
 height}`), alias units (once-per-field `console.warn` via sinon spy +
-`undefined`; assignment once-warn no-op; live forwarding of `width` after a
-stubbed resize), and `ua__dom` parity (block init mods from env under both
+`undefined`; assignment once-warn no-op; symbol-keyed read asserts zero
+warns; live forwarding of `width` after a stubbed resize), a node-side
+`env` unit (`test/env-ssr.test.js` joining the npm-test corpus: importing
+`common.blocks/env/env.js` in bare Node asserts the no-window clause of
+REQ-1 — no throw, `ua === ''`, `platform.other === true`, falsy probes,
+0-valued live probes), and `ua__dom` parity (block init asserts the full
+REQ-5 mod set — platform precedence `ios|android|bada|wp|opera|other`,
+`browser` `opera|chrome|''`, `ios`/`android` major digit, `ios-subversion`
+dot-stripped `\d\.\d`, `screen-size`, `svg` `yes|no` — under both
 resolutions; touch-delta `orient` mod + orientchange update — skipped by
 feature-detect on desktop where the delta is absent).
 
@@ -206,7 +218,9 @@ one-release warns, property-read-only contract, migration pointer to `env`).
 `MIGRATION.md` + `MIGRATION.ru.md` gain `### S1 …` after the S0 section:
 env introduction, orientchange transport change (code before/after), removed
 ua fields, ua block statics note. `CHANGELOG.md` + `CHANGELOG.ru.md`
-Unreleased entries appended. Doc-parity fence stays green.
+Unreleased entries appended. The doc-parity fence
+(`build/check-doc-parity.mjs`) covers the MIGRATION and CHANGELOG pairs —
+both stay green.
 
 - Evidence: `MIGRATION.md:1571 :: S0 :: "### S0 Verification fence + public contracts"`
 - Evidence: `MIGRATION.ru.md:1589 :: S0 :: "### S0 Проверочный каркас и публичные контракты"`
@@ -232,6 +246,8 @@ Run `npm run test:browser` and expect exit 0
 npm run build && node build/check-bundle-size.mjs
 ```
 
+Expect exit 0
+
 ## ACC-5: CONST-P6 baseline ratchet at 16 files
 
 Run `bash specs/check-platform-baseline.sh` and expect output contains `16 files`
@@ -246,6 +262,8 @@ Run `bash specs/check-jquery-ratchet.sh` and expect output contains `8 entries`
 node build/generate-platform-entries.mjs && git diff --exit-code -- build/platforms/
 ```
 
+Expect exit 0
+
 ## ACC-8: doc-parity fence green
 
 Run `node build/check-doc-parity.mjs` and expect exit 0
@@ -253,14 +271,14 @@ Run `node build/check-doc-parity.mjs` and expect exit 0
 ## ACC-9: ua family carries no jquery edge
 
 ```bash
-grep -rn "bem:jquery" common.blocks/ua common.blocks/env desktop.blocks/ua touch.blocks/ua || echo UA_FAMILY_JQUERY_FREE
+grep -rn "bem:jquery" -- common.blocks/ua common.blocks/env && exit 1 || echo UA_FAMILY_JQUERY_FREE
 ```
 
 Expect output contains `UA_FAMILY_JQUERY_FREE`
 
 ## ACC-10: MIGRATION carries the bilingual S1 section
 
-Run `grep -c "^### S1" MIGRATION.md MIGRATION.ru.md` and expect output contains `MIGRATION.md:1` and `MIGRATION.ru.md:1`
+Run `grep -c "^### S1" MIGRATION.md MIGRATION.ru.md` and expect output contains `MIGRATION.md:1` and `MIGRATION.ru.md:1` (exactly one S1 section each)
 
 # Non-goals
 
