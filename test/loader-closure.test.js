@@ -16,7 +16,9 @@
  * is the frozen pre-migration planning document; and two mechanical
  * exceptions — this checker itself, plus `test/platform-entries.test.js`
  * whose S3 divergence map names what it subtracts from the frozen baseline.
- * Build output (dist/) and node_modules are out of scope.
+ * Build output (dist/) and node_modules are out of scope, as is `.beads/` —
+ * the Gas Town rig ledger (untracked, Dolt noms) lives in the local repo
+ * tree and its bead text names forbidden paths by design (bc-ks0s).
  */
 
 import { describe, it } from 'node:test';
@@ -26,7 +28,7 @@ import { join, relative, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'docs']);
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'docs', '.beads']);
 const RECORD_KEEPERS = [
     'MIGRATION.md',
     'MIGRATION.ru.md',
