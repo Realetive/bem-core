@@ -18,7 +18,10 @@
  * whose S3 divergence map names what it subtracts from the frozen baseline.
  * Build output (dist/) and node_modules are out of scope, as is `.beads/` —
  * the Gas Town rig ledger (untracked, Dolt noms) lives in the local repo
- * tree and its bead text names forbidden paths by design (bc-ks0s).
+ * tree and its bead text names forbidden paths by design (bc-ks0s) — and
+ * so are the rig's untracked planning-artifact dirs (`.designs/`,
+ * `.prd-reviews/`, `.plan-reviews/`, `.spec-reviews/`), whose review text
+ * documents deleted loader paths by design (bc-ptbi).
  */
 
 import { describe, it } from 'node:test';
@@ -28,7 +31,11 @@ import { join, relative, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'docs', '.beads']);
+const SKIP_DIRS = new Set([
+    '.git', 'node_modules', 'dist', 'docs',
+    '.beads', // Gas Town rig ledger (bc-ks0s)
+    '.designs', '.prd-reviews', '.plan-reviews', '.spec-reviews', // rig planning artifacts (bc-ptbi)
+]);
 const RECORD_KEEPERS = [
     'MIGRATION.md',
     'MIGRATION.ru.md',
