@@ -11,7 +11,7 @@ import bemDom from 'bem:i-bem-dom';
 import env from 'bem:env';
 
 export default function(base) {
-    bemDom.declBlock('ua',
+    return bemDom.declBlock('ua',
         {
             onSetMod : {
                 'js' : {
@@ -29,6 +29,4 @@ export default function(base) {
                 }
             }
         });
-
-    return base;
 };

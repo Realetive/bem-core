@@ -4,13 +4,20 @@ import bemLevels from './plugins/vite-plugin-bem-levels.js';
 
 const rootDir = resolve(import.meta.dirname, '..');
 
+// Browser-test platform parametrization (S1, spec bc-cah4 REQ-6): the desktop
+// project serves the desktop level set on 5174; the touch-emulated project
+// serves the touch level set on 5175. The platform decides which
+// redefinition chain barrels the bem:* virtual modules resolve to (e.g.
+// bem:ua__dom gains the touch delta on the touch platform).
+const platform = process.env.BEM_TEST_PLATFORM || 'desktop';
+const port = Number(process.env.BEM_TEST_PORT) || (platform === 'touch'? 5175 : 5174);
+
 export default defineConfig({
     root: rootDir,
 
     plugins: [
         bemLevels({
-            // Use desktop platform for browser tests
-            platform: 'desktop',
+            platform,
             levels: {
                 common: ['common.blocks'],
                 desktop: ['common.blocks', 'desktop.blocks'],
@@ -27,7 +34,7 @@ export default defineConfig({
     },
 
     server: {
-        port: 5174,
+        port,
         open: false,
         // Dual-stack loopback: the loader CORS spec loads the same fixture
         // through the other loopback literal (localhost <-> 127.0.0.1),

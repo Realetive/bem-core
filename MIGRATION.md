@@ -1611,3 +1611,32 @@ const module = await loader(url); // resolves to the module namespace
 **Cross-origin loads now require CORS.** Dynamic `import()` enforces CORS on the target (`Access-Control-Allow-Origin`); the old script-injection loader did not. A repo-wide audit found zero absolute-URL loader call sites (see `specs/bc-ilml.md` for the audit result and the semantics table); cross-origin consumers must ensure their target sends CORS headers.
 
 Other semantic shifts, recorded in `specs/bc-ilml.md`: the in-flight dedup / loaded-once cache is now the browser's native module map; the `file:`-protocol prefix fix is gone (Vite/Node resolve natively); no load timeout exists (none existed in `loader_type_js` either — the PRD's timeout requirement was stale).
+
+### S1 env/ua: capability env module; deprecated ua alias; platform fork collapse
+
+**New `env` module (`bem:env`).** The two platform `ua` forks (desktop jQuery-1.8-style browser sniff, touch feature sniff) are replaced by one getter-only capability module in `common.blocks/env/env.js`: `ua` (raw string), UA-derived `platform` (`ios`/`android`/`bada`/`wp` versions or `other: true`), `ios`, `android`, `browser` (`opera`/`chrome`), capability probes `screenSize`/`svg`, and live viewport probes `width`/`height`/`landscape`. Detection is lazy and memoized per distinct observed user agent; no DOM is read at module evaluation (importing in SSR yields `ua: ''`, `platform.other: true`, falsy probes, 0-valued live probes).
+
+**`ua` is now a one-release alias of `env`.** `bem:ua` live-forwards the fields above to `env`. Reads of removed fields — `msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video` — warn once per field and return `undefined`; assignments warn once and no-op; symbol-keyed reads never warn. The contract is property-read access only — destructuring/spread snapshots are unsupported by design. The alias (and with it `env.browser`'s legacy `opera`/`chrome` keys) is removed in the first post-series release — migrate to `bem:env`.
+
+```js
+// before
+import ua from 'bem:ua';
+if(ua.msie) { /* ... */ }
+// after (msie & friends are gone — detect what you actually need)
+import env from 'bem:env';
+if(env.platform.ios) { /* ... */ }
+```
+
+**`orientchange` is now a native CustomEvent.** The touch `ua` module triggered it through jQuery on `window`; `env` dispatches `new CustomEvent('orientchange', { detail: { landscape, width, height } })` on `window`, preserving the Android shrink-guard (fires only when landscape AND width both change):
+
+```js
+// before
+import $ from 'jquery';
+$(window).on('orientchange', (e, data) => { data.landscape; data.width; });
+// after
+window.addEventListener('orientchange', e => { e.detail.landscape; e.detail.width; });
+```
+
+**`ua__dom` is common with a touch delta.** The block's modifier set is unchanged (`platform`, `browser`, `ios`, `android`, `ios-subversion`, `screen-size`, `svg`; touch adds `orient` and updates it from `orientchange`). Internal change: the old `staticProps = ua` binding (ua fields as block-class statics) is dropped — read the `env` module getters instead.
+
+**Platform forks deleted.** `desktop.blocks/ua/ua.js` and `touch.blocks/ua/{ua.js,ua.ru.md,ua.deps.js}` are gone; `bem:ua` resolves to the common alias on both platforms. The ua family no longer depends on jQuery.

@@ -2,6 +2,25 @@
 
 Use this block to collect data about the user's browser.
 
+> **Deprecated since 6.0.0**: the `ua` JS module is now a one-release alias of the new [`env`](../env/env.en.md) module and is removed in the next release — migrate to `env`.
+
+## The ua module alias
+
+`bem:ua` live-forwards property reads to the `env` module: `ua`, `platform`, `ios`, `android`, `bada`, `wp`, `other`, `browser`, `opera`, `chrome`, `screenSize`, `svg`, `width`, `height`, `landscape`. Notes:
+
+- **Removed fields** — `msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video` — warn once per field (via `console.warn`) and return `undefined`; any other non-forwarded field behaves the same.
+- **Assignments** warn once and are ignored.
+- **Property-read contract only**: destructuring and spread snapshots are unsupported by design — the values are live.
+
+```js
+// before
+import ua from 'bem:ua';
+if(ua.msie) { /* ... */ }
+// after
+import env from 'bem:env';
+if(env.platform.ios) { /* ... */ }
+```
+
 ## Overview
 
 ### Elements of the block

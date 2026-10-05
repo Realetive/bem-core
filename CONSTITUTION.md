@@ -44,8 +44,7 @@ common.blocks/i-bem-dom/__events/i-bem-dom__events.deps.js
 common.blocks/i-bem-dom/__init/_auto/i-bem-dom__init_auto.deps.js
 common.blocks/i-bem-dom/i-bem-dom.deps.js
 common.blocks/i-bem-dom/i-bem-dom.tests/benchmarks.blocks/page/page.deps.js
-common.blocks/idle/idle.deps.js
-touch.blocks/ua/ua.deps.js"
+common.blocks/idle/idle.deps.js"
 BAD=$(printf '%s\n' "$JQ" | LC_ALL=C comm -23 - <(printf '%s\n' "$ALLOW" | LC_ALL=C sort))
 STALE=$(printf '%s\n' "$ALLOW" | LC_ALL=C comm -13 - <(printf '%s\n' "$JQ" | LC_ALL=C sort))
 [ -z "$BAD" ] || { echo "new jquery consumers: $BAD"; exit 1; }

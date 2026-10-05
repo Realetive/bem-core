@@ -5,8 +5,9 @@
  * update + MIGRATION entry reddens here.
  *
  * Notes recorded by this test (OQ dispositions):
- *  - `env` is an S1 artifact: not part of the pinned set until S1 lands.
- *  - `ua` JS is platform-only (desktop.blocks/touch.blocks): never pinned.
+ *  - `env` + the `ua` alias (common.blocks) are pinned since S1; the former
+ *    platform-only ua forks are deleted — their paths stay asserted as
+ *    deleted-path negatives (platform-only JS stays never-exported).
  *  - `loader` root module (`common.blocks/loader/loader.js`) is the S3
  *    canonical form — the pin flipped from the deleted `_type` mod path to
  *    the root module in S3's own commit (bc-ilml).
@@ -49,6 +50,10 @@ const PINNED_PUBLIC_DEEP_IMPORTS = [
     'bem-core/common.blocks/events/__observable/_type/events__observable_type_bem-dom.js',
     // dom
     'bem-core/common.blocks/dom/dom.js',
+    // env + ua (S1: capability module + deprecated alias; the former
+    // desktop/touch ua forks are deleted — their paths stay in DELETED_PATHS)
+    'bem-core/common.blocks/env/env.js',
+    'bem-core/common.blocks/ua/ua.js',
     // loader (S3 canonical root-module form)
     'bem-core/common.blocks/loader/loader.js',
 ];
@@ -124,13 +129,17 @@ describe('api-pin: supported deep-import inventory', function() {
         assert.strictEqual(pkg.exports['./dist/touch'], './dist/touch/bem-core.mjs');
     });
 
-    it('barrel exports the six plain DOM-flavor names (D-7) + loader (S3)', function() {
+    it('barrel exports the eight plain DOM-flavor names (D-7) + loader (S3)', function() {
         const barrel = readFileSync(resolve(ROOT, 'build/barrel.js'), 'utf8');
-        for (const name of ['bemDom', 'BemDomCollection', 'dom', 'Emitter', 'Event', 'channels']) {
+        for (const name of ['bemDom', 'BemDomCollection', 'dom', 'Emitter', 'Event', 'channels', 'env', 'ua']) {
             assert.ok(barrel.includes(name), `barrel must export ${name}`);
         }
         assert.ok(barrel.includes("export { default as loader } from 'bem:loader';"),
             'S3 switched the barrel to the bem:loader root module');
+        assert.ok(barrel.includes("export { default as env } from 'bem:env';"),
+            'S1 added the env capability module to the barrel');
+        assert.ok(barrel.includes("export { default as ua } from 'bem:ua';"),
+            'S1 added the deprecated ua alias to the barrel');
         assert.ok(!barrel.includes('entities'),
             'bem.entities is internal (OQ-7) — never a barrel export');
     });

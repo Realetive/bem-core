@@ -181,22 +181,33 @@ describe('parseModulesDefine (real file cross-check)', function() {
         assert.ok(source.includes('export default'), 'should have export default');
     });
 
-    it('real file: ua touch base is now ESM (migrated)', function() {
+    it('real file: ua common alias is now ESM (migrated)', function() {
+        // S1 collapsed the desktop/touch ua forks; bem:ua is the common alias
         const source = readFileSync(
-            resolve(ROOT, 'touch.blocks/ua/ua.js'), 'utf8'
+            resolve(ROOT, 'common.blocks/ua/ua.js'), 'utf8'
         );
         const result = parseModulesDefine(source);
         assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
         assert.ok(source.includes('export default'), 'should have export default');
     });
 
-    it('real file: ua__dom touch is now ESM (migrated)', function() {
+    it('real file: ua__dom common base is now ESM (migrated)', function() {
+        const source = readFileSync(
+            resolve(ROOT, 'common.blocks/ua/__dom/ua__dom.js'), 'utf8'
+        );
+        const result = parseModulesDefine(source);
+        assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
+        assert.ok(source.includes('export default'), 'should have export default');
+    });
+
+    it('real file: ua__dom touch delta is transformer-form ESM (S1)', function() {
         const source = readFileSync(
             resolve(ROOT, 'touch.blocks/ua/__dom/ua__dom.js'), 'utf8'
         );
         const result = parseModulesDefine(source);
         assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
-        assert.ok(source.includes('export default'), 'should have export default');
+        assert.ok(/export\s+default\s+function\s*\([^)]+\)\s*\{/.test(source),
+            'touch delta must be transformer-form export default function(prev)');
     });
 
     it('real file: desktop winresize is now ESM (migrated)', function() {
@@ -237,13 +248,16 @@ describe('scanLevel', function() {
 
     it('scans desktop.blocks', function() {
         const modules = scanLevel(resolve(ROOT, 'desktop.blocks'));
-        assert.ok(modules.has('ua'), 'Should find ua on desktop');
+        // S1: desktop.blocks/ua is deleted (fork collapse) — ua resolves in common
+        assert.ok(!modules.has('ua'), 'ua must be gone from desktop (S1 fork collapse)');
         assert.ok(modules.has('jquery__config'), 'Should find jquery__config on desktop');
     });
 
     it('scans touch.blocks', function() {
         const modules = scanLevel(resolve(ROOT, 'touch.blocks'));
-        assert.ok(modules.has('ua'), 'Should find ua on touch');
+        // S1: touch.blocks/ua ua.js is deleted; only the ua__dom delta survives
+        assert.ok(!modules.has('ua'), 'ua JS must be gone from touch (S1 fork collapse)');
+        assert.ok(modules.has('ua__dom'), 'Should find the ua__dom touch delta');
     });
 
     it('returns empty map for non-existent directory', function() {

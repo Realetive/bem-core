@@ -64,6 +64,13 @@ import bemDomInit from 'bem:i-bem-dom__init';
 
 import eventsObservableBemDom from 'bem:events__observable_type_bem-dom';
 
+// env/ua family (S1): the capability module, its deprecated alias and the
+// block. bem:ua__dom resolves to the common base on the desktop platform and
+// to base + touch delta under BEM_TEST_PLATFORM=touch.
+import env from 'bem:env';
+import ua from 'bem:ua';
+import uaDom from 'bem:ua__dom';
+
 // ── 4. BEMHTML shim ───────────────────────────────────────────────────────────
 import BEMHTML from './bemhtml-shim.js';
 
@@ -82,6 +89,9 @@ window.modules = createModulesShim({
     events,
     'events__observable': eventsObservableBemDom,
     'events__observable_type_bem-dom': eventsObservableBemDom,
+    env,
+    ua,
+    'ua__dom': uaDom,
     dom,
     cookie,
     tick,

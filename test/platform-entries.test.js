@@ -18,9 +18,21 @@ function bemTokensFrom(source) {
 // Documented divergences of the generated entry from the frozen pre-S0
 // baseline. The parity assertion exists to forbid *silent* drops (OQ-6);
 // deliberate payload changes must be enumerated here with their slice.
+// Additions are recorded per platform; S3's removals predate this ledger's
+// per-platform form and stay in their original shape — slices from S1 on
+// declare additions only (drops remain unamendable).
 const S3_DIVERGENCE = {
     added: ['bem:loader'],
     removed: ['bem:loader_type_js', 'bem:loader_type_bundle'], // bc-ilml (D-16, Q7)
+};
+
+const SLICE_ADDITIONS = {
+    // S1 (bc-4izq): the env capability module joins both payloads; the
+    // ua__dom common base becomes visible on desktop (touch already had it
+    // from its now-deleted platform fork). bem:ua itself is unchanged — it
+    // moved from the platform forks to common.blocks, same module name.
+    desktop: ['bem:env', 'bem:ua__dom'],
+    touch: ['bem:env'],
 };
 
 function readIfExists(filePath) {
@@ -41,16 +53,16 @@ describe('platform entry generation (payload parity)', function() {
                     'generated entry must carry the @generated header');
             });
 
-            it('payload parity: generated bem: set equals the pre-S0 hand-list set (± documented S3 divergence)', function() {
+            it('payload parity: generated bem: set equals the pre-S0 hand-list set (± documented slice deltas)', function() {
                 const gen = readFileSync(genPath, 'utf8');
                 const baseline = readFileSync(baselinePath, 'utf8');
                 const genSet = [...new Set(bemTokensFrom(gen))].sort();
                 const baselineSet = [...new Set(bemTokensFrom(baseline))]
                     .filter((token) => !S3_DIVERGENCE.removed.includes(token))
-                    .concat(S3_DIVERGENCE.added)
+                    .concat(S3_DIVERGENCE.added, SLICE_ADDITIONS[platform])
                     .sort();
                 assert.deepStrictEqual(genSet, baselineSet,
-                    `generated ${platform} entry diverged from the pre-S0 baseline beyond the documented S3 delta`);
+                    `generated ${platform} entry diverged from the pre-S0 baseline beyond the documented slice deltas`);
             });
 
             it('keyboard__codes survives generation (OQ-6: silent drop forbidden)', function() {

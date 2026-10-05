@@ -4,7 +4,7 @@
  *
  * Plain names = DOM flavor (the dominant authoring surface); vanilla-only
  * `i-bem` authoring stays a documented deep-import. v1 re-exports existing
- * modules only (env/ua join in S1; loader switched to the `bem:loader` root
+ * modules only (env/ua joined in S1; loader switched to the `bem:loader` root
  * module in S3).
  *
  * Built to `dist/index.mjs` by `build/vite.barrel.config.js`; the package root
@@ -18,3 +18,5 @@ import events from 'bem:events';
 export const { Emitter, Event } = events;
 export { default as channels } from 'bem:events__channels';
 export { default as loader } from 'bem:loader';
+export { default as env } from 'bem:env';
+export { default as ua } from 'bem:ua';
