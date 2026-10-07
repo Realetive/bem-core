@@ -66,6 +66,19 @@ Public API of `i-bem`, `i-bem-dom`, `events` may only change or shrink
 inside a slice whose spec documents the migration for consumers
 (cf. upstream MIGRATION.md culture; keep updating MIGRATION.md per slice).
 
+### CONST-P7: Exploration budget — act, don't just read
+Agents working on implementation tasks MUST start writing code within a
+bounded exploration phase. Maximum 8 read-only tool calls (read, grep, glob)
+before the first write. If more context is needed after writing has started,
+read only the specific file being edited. Infinite exploration without
+code generation is a failure mode, not thoroughness.
+
+```sdd-check
+# Heuristic: if the session's tool log shows >12 consecutive read-only
+# calls with zero writes, flag it (manual review, not auto-block)
+true
+```
+
 ### CONST-P5: Hard fork anchored at tag v5-base
 This fork diverges globally; tag `v5-base` is the comparison point for
 "before/after". Upstream advisories are reviewed manually; merges from
