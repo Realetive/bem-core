@@ -1,0 +1,13 @@
+{
+  "comment": "Bench ratio gate (design doc 'Bench project', S2): B1-B4 min-of-9 (plus warmup round) captured on the v5-base tag (jquery era, commit 7a9e932) with the same harness (test/bench); baseline per metric is the best of repeated captures (the code's capability, not a noisy run). B5 (heap delta) is absolute-capped. The gate fires from S2 onward (S3 exempt); bench retries absorb run noise.",
+  "capturedAt": "2026-10-08",
+  "captureRef": "v5-base (7a9e932)",
+  "harness": "test/bench (min of 9 rounds after warmup; B5 = heap delta median of 5)",
+  "metrics": {
+    "b1InitMs": { "baseline": 13.7, "maxRatio": 1.10 },
+    "b2DispatchMs": { "baseline": 4.7, "maxRatio": 1.10 },
+    "b3EmitMs": { "baseline": 9.6, "maxRatio": 1.10 },
+    "b4CollectionMs": { "baseline": 4.5, "maxRatio": 1.10 },
+    "b5HeapDeltaBytes": { "baseline": 0, "maxAbsoluteBytes": 1048576 }
+  }
+}

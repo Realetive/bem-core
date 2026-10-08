@@ -120,12 +120,20 @@ window.modules.define('spec', function(provide) {
 });
 
 // ── 6. Import all spec files (dynamic, so window.modules is already set up) ──
-// We use lazy glob (without eager:true) so spec files are imported AFTER this
-// module's top-level code has executed and window.modules is available.
-// Each spec file calls modules.define('spec', …) as a side effect.
+// Per-file accounting (OQ-11): load failures surface in __specInventory.failed
+// instead of silently skipping mocha.
 const specLoaders = import.meta.glob('/common.blocks/**/*.spec.js');
 
-Promise.all(Object.values(specLoaders).map(load => load())).then(() => {
+window.__specInventory = { loaded: [], failed: [] };
+
+Promise.all(
+    Object.entries(specLoaders).map(([path, load]) =>
+        load().then(
+            () => window.__specInventory.loaded.push(path),
+            (error) => window.__specInventory.failed.push({ path, error: String(error) })
+        )
+    )
+).then(() => {
     // ── 7. Run mocha ─────────────────────────────────────────────────────────
     // Resolve 'spec' module → runs all spec factories → registers describe/it.
     window.modules.require(['spec'], function() {

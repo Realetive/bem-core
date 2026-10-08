@@ -26,6 +26,9 @@
 - Браузерный набор гоняется в обоих разрешениях: новый Playwright-проект `chromium-touch` (порт 5175, `BEM_TEST_PLATFORM=touch`, hasTouch + мобильный viewport + эмуляция device UA), новый корпус спек `env`/алиас `ua`/`ua__dom` и node-юнит SSR (`test/env-ssr.test.js`).
 - Новый внутренний DOM-фасад (`bem:dom__facade`): основанный на template scripts-inert `parseHtml` (с policy-тестом D-11) и null-безопасный узловой `contains`; `dom` и внутренности `i-bem-dom` (HTML/контейнмент) потребляют его.
 - `dom.spec.js` — первая спека, конвертированная с jquery-шима на прямые ESM-импорты (harness-exit носитель 1/3).
+- Бенч-гейт по ratio: Playwright-проект `bench` гоняет B1–B5 (инициализация, делегированная диспетчеризация, BEM-эмиты, живая коллекция, деструкт без утечек) с порогом ≤1.10× от базлайнов v5-base в `specs/bench-baselines.json` (`npm run test:bench`, `build/capture-bench.mjs` для перебазирования).
+- Учёт спек-набора: пофайловый ledger (`specs/spec-files.txt` + freshness-тест), поверхностные ошибки загрузки в entry, точное соответствие загруженных ledger-у и свободный liveness-порог вместо магического `>400`.
+- Старые бенчмарк-реликты (`benchmarks.blocks` b1/b2/page, `benchmarks.bemjson.js`) удалены — заменены бенч-проектом.
 
 
 ## 5.0.0

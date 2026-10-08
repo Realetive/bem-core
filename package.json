@@ -43,9 +43,10 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "node --test build/plugins/vite-plugin-bem-levels.test.js common.blocks/i18n/i18n.test.js test/api-pin.test.js test/platform-entries.test.js test/gate-fixtures.test.js test/spike-dynamic-import.test.js test/loader-closure.test.js test/env-ssr.test.js",
-    "test:browser": "playwright test",
+    "test": "node --test build/plugins/vite-plugin-bem-levels.test.js common.blocks/i18n/i18n.test.js test/api-pin.test.js test/platform-entries.test.js test/gate-fixtures.test.js test/spike-dynamic-import.test.js test/loader-closure.test.js test/env-ssr.test.js test/spec-ledger.test.js",
+    "test:browser": "playwright test --project=chromium --project=chromium-touch",
     "test:browser:ui": "playwright test --ui",
+    "test:bench": "playwright test --project=bench",
     "test:all": "npm test && npm run test:browser",
     "build": "BEM_PLATFORM=desktop vite build --config build/vite.config.js && BEM_PLATFORM=touch vite build --config build/vite.config.js && vite build --config build/vite.barrel.config.js",
     "build:desktop": "BEM_PLATFORM=desktop vite build --config build/vite.config.js",

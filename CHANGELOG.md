@@ -26,6 +26,9 @@
 - The browser suite runs at both resolutions: a new `chromium-touch` Playwright project (port 5175, `BEM_TEST_PLATFORM=touch`, hasTouch + mobile viewport + device UA emulation), a new `env`/`ua` alias/`ua__dom` spec corpus, and a node-side SSR unit (`test/env-ssr.test.js`).
 - New internal DOM facade (`bem:dom__facade`): template-based scripts-inert `parseHtml` (D-11 policy test included) and a null-safe node-level `contains`; `dom` and the `i-bem-dom` HTML/containment internals consume it.
 - `dom.spec.js` is the first spec converted off the jquery shim to direct ESM imports (harness-exit carrier 1/3).
+- Bench ratio gate: a `bench` Playwright project runs B1–B5 (init, delegated dispatch, BEM emit, live collection, destruct no-leak) gated at ≤1.10× of v5-base baselines recorded in `specs/bench-baselines.json` (`npm run test:bench`, `build/capture-bench.mjs` for re-baselining).
+- Spec-suite accounting: per-file ledger (`specs/spec-files.txt` + freshness test), runtime load-failure surfacing in the entry, exact loaded-vs-ledger match, and a loose liveness floor replace the magic `>400` count.
+- Old benchmark relics (`benchmarks.blocks` b1/b2/page, `benchmarks.bemjson.js`) deleted — superseded by the bench project.
 
 
 ## 5.0.0

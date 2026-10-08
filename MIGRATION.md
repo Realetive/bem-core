@@ -1625,6 +1625,19 @@ jQuery.
 **`jquery__event_type_winresize` deleted**: the IE8-only resize guard is
 dead code on evergreen targets; the native `orientchange` (S1) is unaffected.
 
+**Bench ratio gate**: a Playwright `bench` project runs five scenarios —
+B1 init throughput, B2 delegated dispatch, B3 BEM emit, B4 live collection,
+B5 destruct no-leak (heap delta) — gated at ≤1.10× of the recorded v5-base
+baselines (`specs/bench-baselines.json`; `npm run test:bench`).
+
+**Test-suite accounting**: the magic `>400` mocha floor is replaced by
+per-file spec registration accounting (a committed `specs/spec-files.txt`
+ledger, runtime load-failure surfacing, exact loaded-vs-ledger match) plus a
+loose liveness floor.
+
+**Old benchmark relics deleted**: `benchmarks.blocks` (b1/b2/page) and
+`benchmarks.bemjson.js` are superseded by the bench project.
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js
