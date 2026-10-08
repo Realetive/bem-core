@@ -37,8 +37,7 @@ commit, never on allowlist emptiness alone.
 JQ=$(grep -rl 'jquery' --include='*.deps.js' . 2>/dev/null \
   | grep -v -E '(^|/)(node_modules|dist|\.git)/|(^|/)jquery/' \
   | sed 's|^\./||' | LC_ALL=C sort)
-ALLOW="common.blocks/dom/dom.deps.js
-common.blocks/i-bem-dom/__events/_type/i-bem-dom__events_type_bem.deps.js
+ALLOW="common.blocks/i-bem-dom/__events/_type/i-bem-dom__events_type_bem.deps.js
 common.blocks/i-bem-dom/__events/_type/i-bem-dom__events_type_dom.deps.js
 common.blocks/i-bem-dom/__events/i-bem-dom__events.deps.js
 common.blocks/i-bem-dom/__init/_auto/i-bem-dom__init_auto.deps.js

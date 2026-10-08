@@ -10,6 +10,8 @@
 - **Метаданные репозитория**: `repository.url` теперь указывает на форк (`Realetive/bem-core`).
 - **Схлопнуты платформенные форки `ua` (S1)**: `desktop.blocks/ua/ua.js` и `touch.blocks/ua/ua.js` (плюс `touch.blocks/ua/ua.deps.js`) удалены; `bem:ua` теперь резолвится в общий однорелизный устаревший Proxy-алиас с живой пересылкой в новый capability-модуль `env`. Чтения удалённых полей (`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video`) варнят один раз и возвращают `undefined`; алиас удаляется в 6.1.0 (см. MIGRATION → «S1 env/ua: capability-модуль, алиас ua, схлопывание платформенных форков»).
 - **`orientchange` — нативный CustomEvent (S1)**: диспетчеризуется на `window` модулем `env` с detail `{ landscape, width, height }`, с сохранением shrink-guard для Android; мод `orient` блока `ua` подписывается через нативные DOM-события (см. MIGRATION → «S1 env/ua: capability-модуль, алиас ua, схлопывание платформенных форков»).
+- **`dom` нативен (S2)**: все методы `dom` принимают и возвращают DOM-узлы вместо jQuery-коллекций — `contains(ctxNode, node)` включительно, `getFocused()` возвращает узел, `isFocusable`/`isEditable`/`containsFocus` работают с узлами и null-безопасны; блок больше не зависит от jQuery (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
+- **Разбор HTML не исполняет скрипты (S2, D-11)**: `bemDom.update`, `append`, `prepend`, `before` и `after` больше не исполняют элементы `<script>` из HTML-строк (разбор на основе template; поведение закреплено policy-тестом) (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
 
 ### Возможности
 
@@ -20,6 +22,8 @@
 - Новый capability-модуль `env` (`bem:env`): ленивые мемоизированные UA-геттеры (`ua`, `platform`, `ios`, `android`, `browser`), capability-пробы (`screenSize`, `svg`), живые пробы (`width`, `height`, `landscape`); SSR-безопасен. Корневой barrel теперь экспортирует `env` и `ua` (набор из восьми имён).
 - Блок `ua` получил общую DOM-базу (`common.blocks/ua/__dom/ua__dom.js`); touch-уровень — дельта в форме трансформера, добавляющая мод `orient`, — ноль импортов `bem:jquery` во всём семействе ua.
 - Браузерный набор гоняется в обоих разрешениях: новый Playwright-проект `chromium-touch` (порт 5175, `BEM_TEST_PLATFORM=touch`, hasTouch + мобильный viewport + эмуляция device UA), новый корпус спек `env`/алиас `ua`/`ua__dom` и node-юнит SSR (`test/env-ssr.test.js`).
+- Новый внутренний DOM-фасад (`bem:dom__facade`): основанный на template scripts-inert `parseHtml` (с policy-тестом D-11) и null-безопасный узловой `contains`; `dom` и внутренности `i-bem-dom` (HTML/контейнмент) потребляют его.
+- `dom.spec.js` — первая спека, конвертированная с jquery-шима на прямые ESM-импорты (harness-exit носитель 1/3).
 
 
 ## 5.0.0

@@ -1596,6 +1596,28 @@ The `ua` block's static `ua` module binding is gone — use `env` getters.
 **Root barrel** now exports `env` and `ua` (8-name set).
 **Touch-emulated Playwright project** (`chromium-touch`, port 5175) added.
 
+### S2 Periphery: dom/idle native, winresize deleted
+
+**`dom` API is native (breaking)**: all methods take and return DOM nodes
+instead of jQuery collections — `contains(ctxNode, node)` (inclusive: a node
+contains itself), `getFocused()` returns the focused node, `isFocusable`,
+`isEditable` and `containsFocus` take a node and are null-safe. The block no
+longer depends on jQuery.
+
+```js
+// Before
+dom.contains($('.block1'), $('.block2'));
+dom.getFocused()[0];
+// After
+dom.contains(document.querySelector('.block1'), document.querySelector('.block2'));
+dom.getFocused();
+```
+
+**HTML parsing is scripts-inert (breaking, D-11)**: `bemDom.update`, `append`,
+`prepend`, `before` and `after` with an HTML-string argument no longer execute
+`<script>` elements contained in it. Parsing is template-based; parsed scripts
+stay inert even after insertion. Create scripts programmatically instead.
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js

@@ -5,10 +5,11 @@
 // Imports are in canonical sorted order; cross-module ordering rides
 // static bem: import edges, not list order.
 
-// touch: 37 modules
+// touch: 38 modules
 
 import 'bem:cookie';
 import 'bem:dom';
+import 'bem:dom__facade';
 import 'bem:env';
 import 'bem:events';
 import 'bem:events__channels';

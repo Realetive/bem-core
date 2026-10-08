@@ -1,6 +1,6 @@
 # dom
 
-Блок предоставляет объект, содержащий набор методов для работы с DOM-деревом.
+Блок предоставляет объект с набором методов для работы с DOM-деревом.
 
 ## Обзор
 
@@ -8,11 +8,11 @@
 
 | Имя | Тип возвращаемого значения | Описание |
 | -------- | --- | -------- |
-| <a href="#fields-contains">contains</a>(<br>`ctx {jQuery}`,<br>`domElem {jQuery}`) | `Boolean` | Проверяет, содержит ли один DOM-элемент другой. |
-| <a href="#fields-getFocused">getFocused</a>(<br>`domElem {jQuery} `) | `jQuery` | Служит для получения ссылки на DOM-элемент в фокусе. |
-| <a href="#fields-containsFocus">containsFocus</a>(<br>`domElem {jQuery} `) | `Boolean` | Проверят, содержит ли DOM-элемент или его потомки фокус. |
-| <a href="#fields-isFocusable">isFocusable</a>(<br>`domElem {jQuery} `) | `Boolean` | Проверят, может ли DOM-элемент находиться в фокусе. |
-| <a href="#fields-isEditable">isEditable</a>(<br>`domElem {jQuery}`) | `Boolean` | Проверят, возможен ли в DOM-элементе ввод текста. |
+| <a href="#fields-contains">contains</a>(<br>`ctx {Node}`,<br>`node {Node}`) | `Boolean` | Проверяет, содержит ли DOM-узел другой узел (включая сам узел). |
+| <a href="#fields-getFocused">getFocused</a>() | `Node` | Служит для получения DOM-узла в фокусе. |
+| <a href="#fields-containsFocus">containsFocus</a>(<br>`domNode {Node}`) | `Boolean` | Проверяет, содержится ли фокус в DOM-узле или его потомках. |
+| <a href="#fields-isFocusable">isFocusable</a>(<br>`domNode {Node}`) | `Boolean` | Проверяет, может ли фокус быть установлен на DOM-узел. |
+| <a href="#fields-isEditable">isEditable</a>(<br>`domNode {Node}`) | `Boolean` | Проверяет, возможен ли в DOM-узле ввод текста. |
 
 ### Публичные технологии блока
 
@@ -24,25 +24,23 @@
 
 <a name="fields"></a>
 
-### Свойства и методы объекта
-
 <a name="fields-contains"></a>
 
 #### Метод `contains`
 
-Метод позволяет проверить содержит ли некоторый DOM-элемент `ctx` элемент `domElem`.
+Метод проверяет, содержит ли DOM-узел `ctx` узел `node`. Узел содержит сам себя.
 
 **Принимаемые аргументы:**
 
-* `ctx {jQuery}` – DOM-элемент внутри которого производится поиск. Обязательный аргумент.
-* `domElem {jQuery}` – искомый DOM-элемент. Обязательный аргумент.
+* `ctx {Node}` – DOM-узел, внутри которого выполняется поиск. Обязательный аргумент.
+* `node {Node}` – DOM-узел, который ищется. Обязательный аргумент.
 
-**Возвращаемое значение:** `Boolean`. Если искомый элемент найден – `true`.
+**Возвращаемое значение:** `Boolean`. Если узел найден — `true`.
 
 Пример:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
 /*
 <div class="block1">
@@ -50,114 +48,109 @@ modules.require(['dom', 'jquery'], function(dom, $) {
 </div>
 */
 
-dom.contains($('.block1'), $('.block2'));  // true
+dom.contains(document.querySelector('.block1'), document.querySelector('.block2'));  // true
 
-});
 ```
 
 <a name="fields-getFocused"></a>
 
 #### Метод `getFocused`
 
-Метод служит для получения ссылки на DOM-элемент, находящийся в фокусе.
+Служит для получения ссылки на DOM-узел в фокусе.
 
 Не принимает аргументов.
 
-**Возвращаемое значение:** `jQuery` – объект в фокусе.
+**Возвращаемое значение:** `Node` – DOM-узел в фокусе.
 
 Пример:
 
 ```js
-modules.require(['dom'], function(dom) {
+import dom from 'bem:dom';
 
-dom.getFocused(); // ссылка на элемент в фокусе
+dom.getFocused(); // ссылка на узел в фокусе
 
-});
 ```
 
 <a name="fields-containsFocus"></a>
 
 #### Метод `containsFocus`
 
-Метод проверяет находится ли в фокусе переданный аргументом DOM-элемент или один из его потомков.
+Метод проверяет, находится ли фокус на переданном DOM-узле или одном из его потомков.
 
 **Принимаемые аргументы:**
 
-* `domElem {jQuery}` – проверяемый DOM-элемент. Обязательный аргумент.
+* `domNode {Node}` – DOM-узел для проверки. Обязательный аргумент.
 
-**Возвращаемое значение:** `Boolean`. Если искомый элемент в фокусе – `true`.
+**Возвращаемое значение:** `Boolean`. Если узел в фокусе — `true`.
 
 Пример:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
 /*
 <div class="block1">
-  <input class="block1__control"></div>
+  <input class="block1__control">
 </div>
 */
 
-$('.block1__control').focus();
-dom.containsFocus($('.block1'));  // true
+document.querySelector('.block1__control').focus();
+dom.containsFocus(document.querySelector('.block1'));  // true
 
-});
 ```
 
 <a name="fields-isFocusable"></a>
 
 #### Метод `isFocusable`
 
-Метод проверят может ли браузер пользователя установить фокус на переданный аргументом DOM-элемент.   
+Метод проверяет, может ли браузер пользователя установить фокус на переданный DOM-узел.
 
 **Принимаемые аргументы:**
 
-* `domElem {jQuery}` – проверяемый DOM-элемент. Обязательный аргумент. Если в jQuery-цепочке несколько DOM-элементов, то проверяется первый из них.
+* `domNode {Node}` – DOM-узел для проверки. Обязательный аргумент.
 
-**Возвращаемое значение:** `Boolean`. Если фокус может быть установлен – `true`.
+**Возвращаемое значение:** `Boolean`. Если фокус может быть установлен на узел — `true`.
 
 Пример:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
 /*
 <div class="menu">
-  <a class="menu__item" href="/">Link 1</a>
+  <a class="menu__item" href="/">Ссылка 1</a>
 </div>
 */
 
-dom.isFocusable($('.menu__item')); // true
+dom.isFocusable(document.querySelector('.menu__item')); // true
 
 /*
 <div class="menu">
-  <span class="menu__item menu__item_current">Link 1</span>
+  <span class="menu__item menu__item_current">Ссылка 1</span>
 </div>
 */
 
-dom.isFocusable($('.menu__item')); // false
+dom.isFocusable(document.querySelector('.menu__item')); // false
 
-});
 ```
 
 <a name="fields-isEditable"></a>
 
 #### Метод `isEditable`
 
-Метод проверят возможен ли в переданном аргументом DOM-элементе ввод текста. Другими словами, с помощью метода можно проверить является ли элемент полем ввода, текстовой областью и т.п.
+Метод проверяет, возможен ли ввод текста в переданном DOM-узле. Иначе говоря, метод позволяет проверить, является ли узел полем ввода, текстовым полем и так далее.
 
 **Принимаемые аргументы:**
 
-* `domElem {jQuery}` – проверяемый DOM-элемент. Обязательный аргумент. Если в jQuery-цепочке несколько DOM-элементов, то проверяется первый из них.
+* `domNode {Node}` – DOM-узел для проверки. Обязательный аргумент.
 
-**Возвращаемое значение:** `Boolean`. Если ввод текста в элементе возможен – `true`.
+**Возвращаемое значение:** `Boolean`. Если ввод текста возможен — `true`.
 
 Пример:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
-dom.isEditable($('input, textarea')); // true
+dom.isEditable(document.querySelector('input, textarea')); // true
 
-});
 ```

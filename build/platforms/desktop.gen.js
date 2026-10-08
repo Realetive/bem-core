@@ -5,10 +5,11 @@
 // Imports are in canonical sorted order; cross-module ordering rides
 // static bem: import edges, not list order.
 
-// desktop: 38 modules
+// desktop: 39 modules
 
 import 'bem:cookie';
 import 'bem:dom';
+import 'bem:dom__facade';
 import 'bem:env';
 import 'bem:events';
 import 'bem:events__channels';

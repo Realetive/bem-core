@@ -438,7 +438,7 @@ describe('transformer-form validation', function() {
 
 describe('parseDepsFile', function() {
     it('parses simple shouldDeps', function() {
-        const result = parseDepsFile(resolve(ROOT, 'common.blocks/dom/dom.deps.js'));
+        const result = parseDepsFile(resolve(ROOT, 'test/fixtures/deps/simple.deps.js'));
         assert.ok(result);
         assert.ok(result.shouldDeps.length > 0);
     });

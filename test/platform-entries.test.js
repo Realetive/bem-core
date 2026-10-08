@@ -37,6 +37,13 @@ const SLICE_ADDITIONS = {
         desktop: ['bem:ua__dom'],
         touch: [],
     },
+    // S2: dom goes native behind an internal facade; the facade module joins
+    // both payloads (i-bem-dom imports it directly).
+    S2: {
+        both: ['bem:dom__facade'],
+        desktop: [],
+        touch: [],
+    },
 };
 
 function expectedTokens(platform, baselineSource) {

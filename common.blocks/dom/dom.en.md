@@ -8,11 +8,11 @@ This block provides an object with a set of methods for working with the DOM tre
 
 | Name | Return type | Description |
 | -------- | --- | -------- |
-| <a href="#fields-contains">contains</a>(<br>`ctx {jQuery}`,<br>`domElem {jQuery}`) | `Boolean` | Checks whether a DOM element contains another DOM element. |
-| <a href="#fields-getFocused">getFocused</a>(<br>`domElem {jQuery} `) | `jQuery` | Gets a reference to the DOM element that is in focus. |
-| <a href="#fields-containsFocus">containsFocus</a>(<br>`domElem {jQuery} `) | `Boolean` | Checks whether a DOM element or its descendants contains the focus. |
-| <a href="#fields-isFocusable">isFocusable</a>(<br>`domElem {jQuery} `) | `Boolean` | Checks whether the DOM element is in focus. |
-| <a href="#fields-isEditable">isEditable</a>(<br>`domElem {jQuery}`) | `Boolean` | Checks whether text can be entered in the DOM element. |
+| <a href="#fields-contains">contains</a>(<br>`ctx {Node}`,<br>`node {Node}`) | `Boolean` | Checks whether a DOM node contains another node (inclusive). |
+| <a href="#fields-getFocused">getFocused</a>() | `Node` | Gets the DOM node that is in focus. |
+| <a href="#fields-containsFocus">containsFocus</a>(<br>`domNode {Node}`) | `Boolean` | Checks whether a DOM node or its descendants contain the focus. |
+| <a href="#fields-isFocusable">isFocusable</a>(<br>`domNode {Node}`) | `Boolean` | Checks whether the focus can be set on a DOM node. |
+| <a href="#fields-isEditable">isEditable</a>(<br>`domNode {Node}`) | `Boolean` | Checks whether text can be entered in a DOM node. |
 
 ### Public block technologies
 
@@ -24,25 +24,23 @@ The block is implemented in:
 
 <a name="fields"></a>
 
-### Object properties and methods
-
 <a name="fields-contains"></a>
 
 #### `contains` method
 
-Use this method to check whether a `ctx` DOM element contains `domElem`.
+Use this method to check whether a `ctx` DOM node contains `node`. A node contains itself.
 
 **Accepted arguments:**
 
-* `ctx {jQuery}` – The DOM element to search inside. Required argument.
-* `domElem {jQuery}` – The DOM element to search for. Required argument.
+* `ctx {Node}` – The DOM node to search inside. Required argument.
+* `node {Node}` – The DOM node to search for. Required argument.
 
 **Return value:** `Boolean`. If found, then `true`.
 
 Example:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
 /*
 <div class="block1">
@@ -50,76 +48,73 @@ modules.require(['dom', 'jquery'], function(dom, $) {
 </div>
 */
 
-dom.contains($('.block1'), $('.block2'));  // true
+dom.contains(document.querySelector('.block1'), document.querySelector('.block2'));  // true
 
-});
 ```
 
 <a name="fields-getFocused"></a>
 
 #### `getFocused` method
 
-Gets a reference to the DOM element that is in focus.
+Gets a reference to the DOM node that is in focus.
 
 Doesn't accept arguments.
 
-**Return value:** `jQuery` – The object in focus.
+**Return value:** `Node` – The DOM node in focus.
 
 Example:
 
 ```js
-modules.require(['dom'], function(dom) {
+import dom from 'bem:dom';
 
-dom.getFocused(); // a reference to the element in focus
+dom.getFocused(); // a reference to the node in focus
 
-});
 ```
 
 <a name="fields-containsFocus"></a>
 
 #### `containsFocus` method
 
-This method checks whether the focus is on the DOM element passed in the argument or one of its descendants.
+This method checks whether the focus is on the DOM node passed in the argument or one of its descendants.
 
 **Accepted arguments:**
 
-* `domElem {jQuery}` – The DOM element to check. Required argument.
+* `domNode {Node}` – The DOM node to check. Required argument.
 
-**Return value:** `Boolean`. If this element is in focus, then `true`.
+**Return value:** `Boolean`. If this node is in focus, then `true`.
 
 Example:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
 /*
 <div class="block1">
-  <input class="block1__control"></div>
+  <input class="block1__control">
 </div>
 */
 
-$('.block1__control').focus();
-dom.containsFocus($('.block1'));  // true
+document.querySelector('.block1__control').focus();
+dom.containsFocus(document.querySelector('.block1'));  // true
 
-});
 ```
 
 <a name="fields-isFocusable"></a>
 
 #### `isFocusable` method
 
-This method checks whether the user's browser can set the focus on the DOM element passed in the argument.   
+This method checks whether the user's browser can set the focus on the DOM node passed in the argument.
 
 **Accepted arguments:**
 
-* `domElem {jQuery}` – The DOM element to check. Required argument. If there are mutiple DOM elements in the jQuery chain, the first one is checked.
+* `domNode {Node}` – The DOM node to check. Required argument.
 
-**Return value:** `Boolean`. If the focus can be set on this element, then `true`.
+**Return value:** `Boolean`. If the focus can be set on this node, then `true`.
 
 Example:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
 /*
 <div class="menu">
@@ -127,7 +122,7 @@ modules.require(['dom', 'jquery'], function(dom, $) {
 </div>
 */
 
-dom.isFocusable($('.menu__item')); // true
+dom.isFocusable(document.querySelector('.menu__item')); // true
 
 /*
 <div class="menu">
@@ -135,29 +130,27 @@ dom.isFocusable($('.menu__item')); // true
 </div>
 */
 
-dom.isFocusable($('.menu__item')); // false
+dom.isFocusable(document.querySelector('.menu__item')); // false
 
-});
 ```
 
 <a name="fields-isEditable"></a>
 
 #### `isEditable` method
 
-This method checks whether text can be entered in the DOM element passed in the argument. In other words, you can use this method to check whether the element is an input field, text field, and so on.
+This method checks whether text can be entered in the DOM node passed in the argument. In other words, you can use this method to check whether the node is an input field, text field, and so on.
 
 **Accepted arguments:**
 
-* `domElem {jQuery}` – The DOM element to check. Required argument. If there are mutiple DOM elements in the jQuery chain, the first one is checked.
+* `domNode {Node}` – The DOM node to check. Required argument.
 
-**Return value:** `Boolean`. If text can be entered in the DOM element, then `true`.
+**Return value:** `Boolean`. If text can be entered in the DOM node, then `true`.
 
 Example:
 
 ```js
-modules.require(['dom', 'jquery'], function(dom, $) {
+import dom from 'bem:dom';
 
-dom.isEditable($('input, textarea')); // true
+dom.isEditable(document.querySelector('input, textarea')); // true
 
-});
 ```

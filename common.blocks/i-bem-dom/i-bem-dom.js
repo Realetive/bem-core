@@ -13,6 +13,7 @@ import objects from 'bem:objects'
 import functions from 'bem:functions'
 import $ from 'bem:jquery'
 import dom from 'bem:dom'
+import domFacade from 'bem:dom__facade'
 
 /**
  * Storage for DOM elements by unique key
@@ -282,7 +283,7 @@ function buildElemKey(elem) {
  * @returns {jQuery}
  */
 function getJqueryCollection(html) {
-    if(typeof html === 'string') return $($.parseHTML(html, null, true))
+    if(typeof html === 'string') return $(domFacade.parseHtml(html))
     if(html && html.domElem) return html.domElem
     return $(html)
 }
@@ -738,7 +739,9 @@ const BemDomEntity = inherit(/** @lends BemDomEntity.prototype */{
      * @returns {Boolean}
      */
     containsEntity : function(entity) {
-        return dom.contains(this.domElem, entity.domElem)
+        return this.domElem.toArray().some(ctxNode =>
+            entity.domElem.toArray().some(node =>
+                dom.contains(ctxNode, node)))
     },
 
     /**

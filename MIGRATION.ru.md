@@ -1614,6 +1614,29 @@ window.addEventListener('orientchange', (e) => { e.detail.landscape; });
 **Корневой barrel** теперь экспортирует `env` и `ua` (8-имённый набор).
 **Touch-эмулируемый Playwright-проект** (`chromium-touch`, порт 5175) добавлен.
 
+### S2 Периферия: нативные dom/idle, winresize удалён
+
+**API `dom` нативен (breaking)**: все методы принимают и возвращают DOM-узлы
+вместо jQuery-коллекций — `contains(ctxNode, node)` (включительно: узел содержит
+сам себя), `getFocused()` возвращает узел в фокусе, `isFocusable`, `isEditable`
+и `containsFocus` принимают узел и null-безопасны. Блок больше не зависит от
+jQuery.
+
+```js
+// Было
+dom.contains($('.block1'), $('.block2'));
+dom.getFocused()[0];
+// Стало
+dom.contains(document.querySelector('.block1'), document.querySelector('.block2'));
+dom.getFocused();
+```
+
+**Разбор HTML не исполняет скрипты (breaking, D-11)**: `bemDom.update`,
+`append`, `prepend`, `before` и `after` с HTML-строкой больше не исполняют
+содержащиеся в ней элементы `<script>`. Разбор основан на template;
+испарсенные скрипты остаются неактивными даже после вставки. Создавайте скрипты
+программно.
+
 **Корневой экспорт стал barrel-модулем именованных экспортов.** Корень пакета `.` раньше разрешался в side-effect-пейлоад десктопа (`import 'bem-core'` импортировал всю библиотеку и автоматически её инициализировал). Теперь он разрешается в платформенно-нейтральный barrel `dist/index.mjs` с именованными экспортами (никогда не инициализирует автоматически):
 
 ```js

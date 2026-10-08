@@ -10,6 +10,8 @@
 - **Repository metadata**: `repository.url` now points at the fork (`Realetive/bem-core`).
 - **Platform `ua` forks collapsed (S1)**: `desktop.blocks/ua/ua.js` and `touch.blocks/ua/ua.js` (plus `touch.blocks/ua/ua.deps.js`) are deleted; `bem:ua` now resolves to a common one-release deprecated alias Proxy that live-forwards to the new `env` capability module. Reads of removed fields (`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video`) warn once and return `undefined`; the alias is removed in 6.1.0 (see MIGRATION → "S1 env/ua capability module, ua alias, platform fork collapse").
 - **`orientchange` is a native CustomEvent (S1)**: dispatched on `window` by `env` with `{ landscape, width, height }` detail, preserving the Android shrink-guard; the `ua` block's `orient` mod subscribes via native DOM events (see MIGRATION → "S1 env/ua capability module, ua alias, platform fork collapse").
+- **`dom` is native (S2)**: every `dom` method now takes and returns DOM nodes instead of jQuery collections — `contains(ctxNode, node)` is inclusive, `getFocused()` returns the node, `isFocusable`/`isEditable`/`containsFocus` are node-based and null-safe; the block no longer depends on jQuery (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
+- **HTML parsing is scripts-inert (S2, D-11)**: `bemDom.update`, `append`, `prepend`, `before` and `after` no longer execute `<script>` elements from HTML-string arguments (template-based parsing; a policy test pins the behavior) (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
 
 ### Features
 
@@ -20,6 +22,8 @@
 - New `env` capability module (`bem:env`): lazy memoized UA-derived getters (`ua`, `platform`, `ios`, `android`, `browser`), capability probes (`screenSize`, `svg`), live probes (`width`, `height`, `landscape`); SSR-safe. The root barrel now exports `env` and `ua` (eight-name set).
 - The `ua` block gained a common DOM base (`common.blocks/ua/__dom/ua__dom.js`); the touch level is a transformer-form delta adding the `orient` mod — no `bem:jquery` import anywhere in the ua family.
 - The browser suite runs at both resolutions: a new `chromium-touch` Playwright project (port 5175, `BEM_TEST_PLATFORM=touch`, hasTouch + mobile viewport + device UA emulation), a new `env`/`ua` alias/`ua__dom` spec corpus, and a node-side SSR unit (`test/env-ssr.test.js`).
+- New internal DOM facade (`bem:dom__facade`): template-based scripts-inert `parseHtml` (D-11 policy test included) and a null-safe node-level `contains`; `dom` and the `i-bem-dom` HTML/containment internals consume it.
+- `dom.spec.js` is the first spec converted off the jquery shim to direct ESM imports (harness-exit carrier 1/3).
 
 
 ## 5.0.0
