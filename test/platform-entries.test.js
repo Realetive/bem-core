@@ -18,10 +18,35 @@ function bemTokensFrom(source) {
 // Documented divergences of the generated entry from the frozen pre-S0
 // baseline. The parity assertion exists to forbid *silent* drops (OQ-6);
 // deliberate payload changes must be enumerated here with their slice.
+// Removals are unamendable by design (OQ-6: no-silent-drop) — only the S3
+// loader switch ever deleted tokens; every later slice is additions-only.
 const S3_DIVERGENCE = {
     added: ['bem:loader'],
     removed: ['bem:loader_type_js', 'bem:loader_type_bundle'], // bc-ilml (D-16, Q7)
 };
+
+// Per-slice additions ledger (additions only; spec bc-cah4 REQ-8).
+const SLICE_ADDITIONS = {
+    // S1 (bc-cah4): env capability module ships on both platforms; the ua
+    // block's DOM elem class (ua__dom) gains a common base, so desktop now
+    // imports it too. bem:ua itself stays in both baselines (the platform
+    // forks collapsed onto the common alias — resolution change, not a set
+    // change).
+    S1: {
+        both: ['bem:env'],
+        desktop: ['bem:ua__dom'],
+        touch: [],
+    },
+};
+
+function expectedTokens(platform, baselineSource) {
+    const perSlice = Object.values(SLICE_ADDITIONS)
+        .flatMap((s) => [...s.both, ...s[platform]]);
+    return [...new Set(bemTokensFrom(baselineSource))]
+        .filter((token) => !S3_DIVERGENCE.removed.includes(token))
+        .concat(S3_DIVERGENCE.added, perSlice)
+        .sort();
+}
 
 function readIfExists(filePath) {
     if (!existsSync(filePath)) return null;
@@ -41,16 +66,13 @@ describe('platform entry generation (payload parity)', function() {
                     'generated entry must carry the @generated header');
             });
 
-            it('payload parity: generated bem: set equals the pre-S0 hand-list set (± documented S3 divergence)', function() {
+            it('payload parity: generated bem: set equals pre-S0 baseline + slice additions ledger (± S3 loader switch)', function() {
                 const gen = readFileSync(genPath, 'utf8');
                 const baseline = readFileSync(baselinePath, 'utf8');
                 const genSet = [...new Set(bemTokensFrom(gen))].sort();
-                const baselineSet = [...new Set(bemTokensFrom(baseline))]
-                    .filter((token) => !S3_DIVERGENCE.removed.includes(token))
-                    .concat(S3_DIVERGENCE.added)
-                    .sort();
+                const baselineSet = expectedTokens(platform, baseline);
                 assert.deepStrictEqual(genSet, baselineSet,
-                    `generated ${platform} entry diverged from the pre-S0 baseline beyond the documented S3 delta`);
+                    `generated ${platform} entry diverged from pre-S0 baseline + documented slice additions`);
             });
 
             it('keyboard__codes survives generation (OQ-6: silent drop forbidden)', function() {

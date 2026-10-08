@@ -18,3 +18,5 @@ import events from 'bem:events';
 export const { Emitter, Event } = events;
 export { default as channels } from 'bem:events__channels';
 export { default as loader } from 'bem:loader';
+export { default as env } from 'bem:env';
+export { default as ua } from 'bem:ua';

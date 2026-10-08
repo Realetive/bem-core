@@ -49,6 +49,8 @@ const PINNED_PUBLIC_DEEP_IMPORTS = [
     'bem-core/common.blocks/events/__observable/_type/events__observable_type_bem-dom.js',
     // dom
     'bem-core/common.blocks/dom/dom.js',
+    'bem-core/common.blocks/env/env.js',
+    'bem-core/common.blocks/ua/ua.js',
     // loader (S3 canonical root-module form)
     'bem-core/common.blocks/loader/loader.js',
 ];
@@ -126,7 +128,7 @@ describe('api-pin: supported deep-import inventory', function() {
 
     it('barrel exports the six plain DOM-flavor names (D-7) + loader (S3)', function() {
         const barrel = readFileSync(resolve(ROOT, 'build/barrel.js'), 'utf8');
-        for (const name of ['bemDom', 'BemDomCollection', 'dom', 'Emitter', 'Event', 'channels']) {
+        for (const name of ['bemDom', 'BemDomCollection', 'dom', 'Emitter', 'Event', 'channels', 'env', 'ua']) {
             assert.ok(barrel.includes(name), `barrel must export ${name}`);
         }
         assert.ok(barrel.includes("export { default as loader } from 'bem:loader';"),

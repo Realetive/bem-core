@@ -53,6 +53,10 @@ import bemInternal from 'bem:i-bem__internal';
 import bem from 'bem:i-bem';
 import bemCollection from 'bem:i-bem__collection';
 
+import env from 'bem:env';
+import uaAlias from 'bem:ua';
+import uaDom from 'bem:ua__dom';
+
 import 'bem:i-bem-dom__events';
 import 'bem:i-bem-dom__events_type_dom';
 import 'bem:i-bem-dom__events_type_bem';
@@ -94,6 +98,9 @@ window.modules = createModulesShim({
     'i-bem-dom': bemDom,
     'i-bem-dom__collection': bemDomCollection,
     'i-bem-dom__init': bemDomInit,
+    env,
+    ua: uaAlias,
+    'ua__dom': uaDom,
     jquery: $,
     chai,
     sinon,

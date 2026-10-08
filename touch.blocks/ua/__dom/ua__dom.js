@@ -6,18 +6,20 @@
 import env from 'bem:env';
 import bemDom from 'bem:i-bem-dom';
 
-export default function(prev) {
-    const baseInited = prev.onSetMod.js.inited;
+export default function(_prev) {
+    return bemDom.declBlock('ua', {
+        onSetMod : {
+            js : {
+                inited() {
+                    this.__base.apply(this, arguments);
 
-    prev.onSetMod.js.inited = function() {
-        baseInited.call(this);
+                    this.setMod('orient', env.landscape ? 'landscape' : 'portrait');
 
-        this.setMod('orient', env.landscape ? 'landscape' : 'portrait');
-
-        this._domEvents(bemDom.win).on('orientchange', (e) => {
-            this.setMod('orient', e.detail.landscape ? 'landscape' : 'portrait');
-        });
-    };
-
-    return prev;
+                    this._domEvents(bemDom.win).on('orientchange', (e) => {
+                        this.setMod('orient', e.detail.landscape ? 'landscape' : 'portrait');
+                    });
+                }
+            }
+        }
+    });
 };

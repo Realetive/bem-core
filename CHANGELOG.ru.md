@@ -8,6 +8,8 @@
 - **Публичный API (S0)**: корневой экспорт пакета `.` теперь платформенно-нейтральный barrel именованных экспортов (`dist/index.mjs`: `bemDom`, `BemDomCollection`, `dom`, `Emitter`, `Event`, `channels`) вместо side-effect-пейлоада десктопа — потребители пейлоада переходят на `bem-core/dist/desktop` / `bem-core/dist/touch` (см. MIGRATION → «S0 Проверочный каркас и публичные контракты»).
 - **Карта экспортов сужена (S0)**: маска `"./*"` заменена на `"./common.blocks/*"` + перечисленные записи; deep-импорты вне публичного множества завершаются ошибкой `ERR_PACKAGE_PATH_NOT_EXPORTED` / неразрешённым импортом Vite.
 - **Метаданные репозитория**: `repository.url` теперь указывает на форк (`Realetive/bem-core`).
+- **Схлопнуты платформенные форки `ua` (S1)**: `desktop.blocks/ua/ua.js` и `touch.blocks/ua/ua.js` (плюс `touch.blocks/ua/ua.deps.js`) удалены; `bem:ua` теперь резолвится в общий однорелизный устаревший Proxy-алиас с живой пересылкой в новый capability-модуль `env`. Чтения удалённых полей (`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video`) варнят один раз и возвращают `undefined`; алиас удаляется в 6.1.0 (см. MIGRATION → «S1 env/ua: capability-модуль, алиас ua, схлопывание платформенных форков»).
+- **`orientchange` — нативный CustomEvent (S1)**: диспетчеризуется на `window` модулем `env` с detail `{ landscape, width, height }`, с сохранением shrink-guard для Android; мод `orient` блока `ua` подписывается через нативные DOM-события (см. MIGRATION → «S1 env/ua: capability-модуль, алиас ua, схлопывание платформенных форков»).
 
 ### Возможности
 
@@ -15,6 +17,9 @@
 - Платформенные entry-модули генерируются из реестра сканирования vite-plugin-bem-levels (`build/platforms/*.gen.js`, закоммичены; freshness-диф в CI) — ручные списки удалены.
 - Добавлен проверочный каркас: gate бюджета сборки (`specs/bundle-budget.json` + `build/check-bundle-size.mjs`), проверка CONST-P6 по базлайну платформенных уровней, двунаправленный ratchet CONST-P1 с финальным предикатом «ноль jquery» (поэтапный, обязательный с S6), fence чётности документации en↔ru для пар MIGRATION/CHANGELOG, api-pin-тест инвентаря deep-импортов.
 - `vite-plugin-bem-levels` теперь завершает сборку ошибкой, если участник цепочки переопределений (индекс ≥ 1) не в форме трансформера `export default function(prev)`.
+- Новый capability-модуль `env` (`bem:env`): ленивые мемоизированные UA-геттеры (`ua`, `platform`, `ios`, `android`, `browser`), capability-пробы (`screenSize`, `svg`), живые пробы (`width`, `height`, `landscape`); SSR-безопасен. Корневой barrel теперь экспортирует `env` и `ua` (набор из восьми имён).
+- Блок `ua` получил общую DOM-базу (`common.blocks/ua/__dom/ua__dom.js`); touch-уровень — дельта в форме трансформера, добавляющая мод `orient`, — ноль импортов `bem:jquery` во всём семействе ua.
+- Браузерный набор гоняется в обоих разрешениях: новый Playwright-проект `chromium-touch` (порт 5175, `BEM_TEST_PLATFORM=touch`, hasTouch + мобильный viewport + эмуляция device UA), новый корпус спек `env`/алиас `ua`/`ua__dom` и node-юнит SSR (`test/env-ssr.test.js`).
 
 
 ## 5.0.0

@@ -4,13 +4,17 @@ import bemLevels from './plugins/vite-plugin-bem-levels.js';
 
 const rootDir = resolve(import.meta.dirname, '..');
 
+// Parametrized by the Playwright webServer (REQ-6): desktop project on 5174,
+// touch project on 5175.
+const platform = process.env.BEM_TEST_PLATFORM || 'desktop';
+const port = Number(process.env.BEM_TEST_PORT || (platform === 'touch' ? 5175 : 5174));
+
 export default defineConfig({
     root: rootDir,
 
     plugins: [
         bemLevels({
-            // Use desktop platform for browser tests
-            platform: 'desktop',
+            platform,
             levels: {
                 common: ['common.blocks'],
                 desktop: ['common.blocks', 'desktop.blocks'],
@@ -27,7 +31,7 @@ export default defineConfig({
     },
 
     server: {
-        port: 5174,
+        port,
         open: false,
         // Dual-stack loopback: the loader CORS spec loads the same fixture
         // through the other loopback literal (localhost <-> 127.0.0.1),

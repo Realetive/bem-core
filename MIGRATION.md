@@ -1570,6 +1570,32 @@ provide(BEMDOM);
 
 ### S0 Verification fence + public contracts
 
+### S1 env/ua capability module, ua alias, platform fork collapse
+
+**New public module `env`** (import from `'bem:env'` or root barrel):
+capability-based detection with lazy memoized getters — `ua`, `platform`,
+`ios`, `android`, `browser`, `screenSize`, `svg`; live getters — `width`,
+`height`, `landscape`. SSR-safe (no DOM reads at module evaluation).
+
+**Native `orientchange`** (transport change):
+```js
+// Before (jQuery synthetic event)
+$(window).on('orientchange', (e, data) => { data.landscape; });
+// After (native CustomEvent)
+window.addEventListener('orientchange', (e) => { e.detail.landscape; });
+```
+
+**`ua` is a deprecated alias** — live-forwards to `env`, removed in 6.1.0.
+Removed fields (`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`,
+`ipad`, `dpr`, `flash`, `connection`, `video`) warn once and return `undefined`.
+
+**Platform `ua` forks deleted** — `desktop.blocks/ua/ua.js` and
+`touch.blocks/ua/ua.js` are removed; `bem:ua` resolves to the common alias.
+The `ua` block's static `ua` module binding is gone — use `env` getters.
+
+**Root barrel** now exports `env` and `ua` (8-name set).
+**Touch-emulated Playwright project** (`chromium-touch`, port 5175) added.
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js

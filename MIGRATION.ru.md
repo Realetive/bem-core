@@ -1588,6 +1588,32 @@ provide(BEMDOM);
 
 ### S0 Проверочный каркас и публичные контракты
 
+### S1 env/ua: capability-модуль, алиас ua, схлопывание платформенных форков
+
+**Новый публичный модуль `env`** (импорт из `'bem:env'` или корневого barrel):
+capability-детекция с ленивыми мемоизированными геттерами — `ua`, `platform`,
+`ios`, `android`, `browser`, `screenSize`, `svg`; живые геттеры — `width`,
+`height`, `landscape`. SSR-безопасен (без DOM-чтений при вычислении модуля).
+
+**Нативный `orientchange`** (смена транспорта):
+```js
+// Было (jQuery синтетическое событие)
+$(window).on('orientchange', (e, data) => { data.landscape; });
+// Стало (нативный CustomEvent)
+window.addEventListener('orientchange', (e) => { e.detail.landscape; });
+```
+
+**`ua` — устаревший алиас** — живая пересылка в `env`, удаляется в 6.1.0.
+Удалённые поля (`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`,
+`ipad`, `dpr`, `flash`, `connection`, `video`) варнят один раз и возвращают `undefined`.
+
+**Платформенные форки `ua` удалены** — `desktop.blocks/ua/ua.js` и
+`touch.blocks/ua/ua.js` убраны; `bem:ua` резолвится в общий алиас.
+Статическое связывание `staticProps = ua` убрано — используйте геттеры `env`.
+
+**Корневой barrel** теперь экспортирует `env` и `ua` (8-имённый набор).
+**Touch-эмулируемый Playwright-проект** (`chromium-touch`, порт 5175) добавлен.
+
 **Корневой экспорт стал barrel-модулем именованных экспортов.** Корень пакета `.` раньше разрешался в side-effect-пейлоад десктопа (`import 'bem-core'` импортировал всю библиотеку и автоматически её инициализировал). Теперь он разрешается в платформенно-нейтральный barrel `dist/index.mjs` с именованными экспортами (никогда не инициализирует автоматически):
 
 ```js

@@ -8,6 +8,8 @@
 - **Public API surface (S0)**: the package root export `.` is now the platform-neutral named-export barrel (`dist/index.mjs`: `bemDom`, `BemDomCollection`, `dom`, `Emitter`, `Event`, `channels`) instead of the side-effect desktop payload — payload consumers migrate to `bem-core/dist/desktop` / `bem-core/dist/touch` (see MIGRATION → "S0 Verification fence + public contracts").
 - **Exports map narrowed (S0)**: the `"./*"` wildcard is replaced by `"./common.blocks/*"` + enumerated entries; non-public deep imports now fail with `ERR_PACKAGE_PATH_NOT_EXPORTED` / unresolved Vite imports.
 - **Repository metadata**: `repository.url` now points at the fork (`Realetive/bem-core`).
+- **Platform `ua` forks collapsed (S1)**: `desktop.blocks/ua/ua.js` and `touch.blocks/ua/ua.js` (plus `touch.blocks/ua/ua.deps.js`) are deleted; `bem:ua` now resolves to a common one-release deprecated alias Proxy that live-forwards to the new `env` capability module. Reads of removed fields (`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video`) warn once and return `undefined`; the alias is removed in 6.1.0 (see MIGRATION → "S1 env/ua capability module, ua alias, platform fork collapse").
+- **`orientchange` is a native CustomEvent (S1)**: dispatched on `window` by `env` with `{ landscape, width, height }` detail, preserving the Android shrink-guard; the `ua` block's `orient` mod subscribes via native DOM events (see MIGRATION → "S1 env/ua capability module, ua alias, platform fork collapse").
 
 ### Features
 
@@ -15,6 +17,9 @@
 - Platform entry modules are generated from the vite-plugin-bem-levels scan registry (`build/platforms/*.gen.js`, committed; CI freshness diff) — the hand-maintained lists are gone.
 - Verification fence landed: bundle-budget gate (`specs/bundle-budget.json` + `build/check-bundle-size.mjs`), CONST-P6 platform-baseline check, bidirectional CONST-P1 jquery ratchet with the final zero-jquery predicate (staged, binding at S6), doc-parity fence for MIGRATION/CHANGELOG en↔ru pairs, api-pin test for the deep-import inventory.
 - `vite-plugin-bem-levels` now hard-errors when a redefinition-chain entry (index ≥ 1) is not transformer-form `export default function(prev)`.
+- New `env` capability module (`bem:env`): lazy memoized UA-derived getters (`ua`, `platform`, `ios`, `android`, `browser`), capability probes (`screenSize`, `svg`), live probes (`width`, `height`, `landscape`); SSR-safe. The root barrel now exports `env` and `ua` (eight-name set).
+- The `ua` block gained a common DOM base (`common.blocks/ua/__dom/ua__dom.js`); the touch level is a transformer-form delta adding the `orient` mod — no `bem:jquery` import anywhere in the ua family.
+- The browser suite runs at both resolutions: a new `chromium-touch` Playwright project (port 5175, `BEM_TEST_PLATFORM=touch`, hasTouch + mobile viewport + device UA emulation), a new `env`/`ua` alias/`ua__dom` spec corpus, and a node-side SSR unit (`test/env-ssr.test.js`).
 
 
 ## 5.0.0
