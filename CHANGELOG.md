@@ -12,6 +12,8 @@
 - **`orientchange` is a native CustomEvent (S1)**: dispatched on `window` by `env` with `{ landscape, width, height }` detail, preserving the Android shrink-guard; the `ua` block's `orient` mod subscribes via native DOM events (see MIGRATION → "S1 env/ua capability module, ua alias, platform fork collapse").
 - **`dom` is native (S2)**: every `dom` method now takes and returns DOM nodes instead of jQuery collections — `contains(ctxNode, node)` is inclusive, `getFocused()` returns the node, `isFocusable`/`isEditable`/`containsFocus` are node-based and null-safe; the block no longer depends on jQuery (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
 - **HTML parsing is scripts-inert (S2, D-11)**: `bemDom.update`, `append`, `prepend`, `before` and `after` no longer execute `<script>` elements from HTML-string arguments (template-based parsing; a policy test pins the behavior) (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
+- **`idle` is native (S2)**: user-action monitoring uses native document listeners; the block no longer depends on jQuery (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
+- **`jquery__event_type_winresize` deleted (S2)**: the IE8-only resize special-event guard is dead code on evergreen targets; the desktop payload drops it (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
 
 ### Features
 

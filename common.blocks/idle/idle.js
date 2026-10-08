@@ -4,10 +4,9 @@
 
 import inherit from 'bem:inherit'
 import events from 'bem:events'
-import $ from 'bem:jquery'
 
 const IDLE_TIMEOUT = 3000,
-    USER_EVENTS = 'mousemove keydown click',
+    USER_EVENTS = ['mousemove', 'keydown', 'click'],
     /**
      * @class Idle
      * @augments events:Emitter
@@ -30,7 +29,8 @@ const IDLE_TIMEOUT = 3000,
                 this._isStarted = true
                 this._startTimer()
                 this._onUserActionBound = this._onUserAction.bind(this)
-                $(document).on(USER_EVENTS, this._onUserActionBound)
+                USER_EVENTS.forEach(eventName =>
+                    document.addEventListener(eventName, this._onUserActionBound))
             }
         },
 
@@ -41,7 +41,8 @@ const IDLE_TIMEOUT = 3000,
             if(this._isStarted) {
                 this._isStarted = false
                 this._stopTimer()
-                $(document).off(USER_EVENTS, this._onUserActionBound)
+                USER_EVENTS.forEach(eventName =>
+                    document.removeEventListener(eventName, this._onUserActionBound))
             }
         },
 

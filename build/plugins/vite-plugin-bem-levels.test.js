@@ -199,9 +199,9 @@ describe('parseModulesDefine (real file cross-check)', function() {
         assert.ok(source.includes('export default'), 'should have export default');
     });
 
-    it('real file: desktop winresize is now ESM (migrated)', function() {
+    it('real file: dom facade is ESM with default export', function() {
         const source = readFileSync(
-            resolve(ROOT, 'desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.js'), 'utf8'
+            resolve(ROOT, 'common.blocks/dom/__facade/dom__facade.js'), 'utf8'
         );
         const result = parseModulesDefine(source);
         assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
@@ -347,15 +347,16 @@ describe('buildRegistry', function() {
             'i-bem__internal', 'uri__querystring', 'strings__escape',
             'events__channels',
             // common.blocks .js
-            'cookie', 'dom', 'jquery', 'idle', 'idle_start_auto',
-            'keyboard__codes', 'loader',
+            'cookie', 'dom', 'dom__facade', 'jquery', 'idle', 'idle_start_auto',
+            'keyboard__codes', 'loader', 'env',
             'events__observable', 'events__observable_type_bem-dom',
             'i-bem__collection', 'i-bem-dom', 'i-bem-dom__collection',
             'i-bem-dom__init', 'i-bem-dom__init_auto',
             'i-bem-dom__events', 'i-bem-dom__events_type_bem',
             'i-bem-dom__events_type_dom', 'jquery__config',
-            // desktop.blocks .js
-            'ua', 'jquery__event_type_winresize',
+            // ua resolves from common since the S1 fork collapse;
+            // jquery__event_type_winresize was deleted in S2
+            'ua',
         ];
 
         const missing = expectedModules.filter(m => !reg.modules.has(m));

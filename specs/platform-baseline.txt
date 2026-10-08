@@ -1,17 +1,14 @@
 # CONST-P6 platform baseline @ f2ab61e (S0): every file in the include-set
 # ({.js,.deps.js,.bemhtml.js,.bh.js,.css} under desktop.blocks/ + touch.blocks/,
-# excluding *.bemjson.js fixtures and *.examples/) is pinned here — 16 files
-# (7 desktop + 9 touch). Files are the only unit; no entity/group counting.
+# excluding *.bemjson.js fixtures and *.examples/) is pinned here — 14 files
+# (5 desktop + 9 touch). Files are the only unit; no entity/group counting.
 # Two-directional ratchet: additions fail, forgotten shrinks fail. The series
 # shrinks this baseline slice by slice to the empty set at S6.
 # Standalone entries (no common.blocks ancestor at the same relative path):
-#   desktop: jquery__config (deps-only), jquery__event_type_winresize,
-#            page__conditional-comment
+#   desktop: jquery__config (deps-only), page__conditional-comment
 #   touch:   ua__dom (deps-only), page__icon
 desktop.blocks/jquery/__config/jquery__config.deps.js
 desktop.blocks/jquery/__config/jquery__config.js
-desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.deps.js
-desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.js
 desktop.blocks/page/__conditional-comment/page__conditional-comment.bemhtml.js
 desktop.blocks/page/__conditional-comment/page__conditional-comment.bh.js
 desktop.blocks/page/page.deps.js

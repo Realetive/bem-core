@@ -18,8 +18,9 @@ function bemTokensFrom(source) {
 // Documented divergences of the generated entry from the frozen pre-S0
 // baseline. The parity assertion exists to forbid *silent* drops (OQ-6);
 // deliberate payload changes must be enumerated here with their slice.
-// Removals are unamendable by design (OQ-6: no-silent-drop) — only the S3
-// loader switch ever deleted tokens; every later slice is additions-only.
+// Additions are ledgered in SLICE_ADDITIONS; removals require a design-doc-
+// authorized entry in SLICE_REMOVALS (never silent). The S3 loader switch is
+// the only pre-ledger removal.
 const S3_DIVERGENCE = {
     added: ['bem:loader'],
     removed: ['bem:loader_type_js', 'bem:loader_type_bundle'], // bc-ilml (D-16, Q7)
@@ -46,11 +47,26 @@ const SLICE_ADDITIONS = {
     },
 };
 
+// Authorized payload removals (design doc slice table, cited per entry).
+const SLICE_REMOVALS = {
+    // S2: the IE8-only resize special-event guard is dead code on evergreen
+    // targets (C5) — deleted from the desktop payload.
+    S2: {
+        both: [],
+        desktop: ['bem:jquery__event_type_winresize'],
+        touch: [],
+    },
+};
+
 function expectedTokens(platform, baselineSource) {
+    const removals = [
+        ...S3_DIVERGENCE.removed,
+        ...Object.values(SLICE_REMOVALS).flatMap((s) => [...s.both, ...s[platform]]),
+    ];
     const perSlice = Object.values(SLICE_ADDITIONS)
         .flatMap((s) => [...s.both, ...s[platform]]);
     return [...new Set(bemTokensFrom(baselineSource))]
-        .filter((token) => !S3_DIVERGENCE.removed.includes(token))
+        .filter((token) => !removals.includes(token))
         .concat(S3_DIVERGENCE.added, perSlice)
         .sort();
 }

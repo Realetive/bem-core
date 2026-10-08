@@ -1618,6 +1618,13 @@ dom.getFocused();
 `<script>` elements contained in it. Parsing is template-based; parsed scripts
 stay inert even after insertion. Create scripts programmatically instead.
 
+**`idle` is native**: user-action monitoring uses native `document`
+listeners (`mousemove`/`keydown`/`click`); the block no longer depends on
+jQuery.
+
+**`jquery__event_type_winresize` deleted**: the IE8-only resize guard is
+dead code on evergreen targets; the native `orientchange` (S1) is unaffected.
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js

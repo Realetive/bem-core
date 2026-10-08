@@ -12,6 +12,8 @@
 - **`orientchange` — нативный CustomEvent (S1)**: диспетчеризуется на `window` модулем `env` с detail `{ landscape, width, height }`, с сохранением shrink-guard для Android; мод `orient` блока `ua` подписывается через нативные DOM-события (см. MIGRATION → «S1 env/ua: capability-модуль, алиас ua, схлопывание платформенных форков»).
 - **`dom` нативен (S2)**: все методы `dom` принимают и возвращают DOM-узлы вместо jQuery-коллекций — `contains(ctxNode, node)` включительно, `getFocused()` возвращает узел, `isFocusable`/`isEditable`/`containsFocus` работают с узлами и null-безопасны; блок больше не зависит от jQuery (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
 - **Разбор HTML не исполняет скрипты (S2, D-11)**: `bemDom.update`, `append`, `prepend`, `before` и `after` больше не исполняют элементы `<script>` из HTML-строк (разбор на основе template; поведение закреплено policy-тестом) (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
+- **`idle` нативен (S2)**: мониторинг действий пользователя на нативных слушателях document; блок больше не зависит от jQuery (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
+- **`jquery__event_type_winresize` удалён (S2)**: guard resize для IE8 — мёртвый код на evergreen-целях; десктопный пейлоад его теряет (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
 
 ### Возможности
 
