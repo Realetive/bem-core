@@ -1,0 +1,207 @@
+# Design exploration (arch-overhaul): security — trust boundaries, attack surface, validation
+
+All claims verified against repo @ f2ab61e (branch v5). PRD cites: Problem Statement (jquery wrapper), G1/G3, OQ1–OQ9, "Clarifications from Human Review" Q1–Q10 (final). PRD-review cites: "parity traps" ($.parseHTML keepScripts), "Vite-plugin barrel hazard", "Relic inventory for S2/S7" (test/dist, UMD dist fate), G1 mechanical completion predicate. Constitution: CONST-P1..P5.
+
+## Summary
+
+This is a DOM library, not a service: there is no network surface, no storage of user
+data, no privilege boundary inside the library. The security work of the overhaul is
+therefore concentrated in exactly five places, all verified in source:
+
+1. **One string→DOM parse site** in the whole production tree:
+   `getJqueryCollection()` at `common.blocks/i-bem-dom/i-bem-dom.js:284-287`, called
+   from `init/append/prepend/insertBefore/insertAfter` (lines 1139, 1155, 1165, 1175,
+   1185). It uses `$.parseHTML(html, null, true)` — keepScripts=true — meaning
+   `<script>` elements inside any HTML string passed to these public methods EXECUTE
+   when inserted. This is the single largest self-inflicted XSS footgun in the
+   library and the jquery migration is the one chance to remove it cheaply.
+2. **Two code-evaluation sites, both build-time** (not shipped to browsers):
+   `build/plugins/vite-plugin-bem-levels.js:220` (`new Function('return ' + content)`
+   to evaluate .deps.js files) and the same plugin's `generateBarrel()` (line 503)
+   which chains cross-level redefinitions as `_module = redefId(_module)` with no
+   build-time authoring check — the mis-authored-override hazard the review flagged.
+3. **Loader script injection**: `loader_type_js.js:46-61` (createElement('script') +
+   src) and `loader_type_bundle.js` (script.src + `window._ycssjs` global contract +
+   injected inline `<style>` elements). Bundle loader is deleted per Q7; the js
+   loader moves to `import()`. CSP posture improves strictly.
+4. **Globals/UMD residue**: the UMD dist format (`build/vite.config.js` —
+   `formats: ['es','umd']`, `globals: { jquery: 'jQuery' }`, `name: 'bemCore'`) plus
+   `window._ycssjs` (dies with bundle loader). No other window.* writes exist in
+   production blocks (grep-verified; only reads like `globalThis.setTimeout`).
+5. **Supply chain**: peer-dep jquery ^4 + dev-dep jquery (Q2: both go), stale
+   `test/dist/` ENB-era fixtures including a VENDORED UNPINNED sinon.js (dead weight
+   and an unaudited-code liability), and the question of new runtime deps for the
+   native event engine (answer: none needed, C5 evergreen baseline).
+
+The rest of the "attack surface" (selectors, error paths, templates, CI) is verified
+to be either nonexistent (no outerHTML anywhere in production blocks) or correctness-
+only. The design doc should adopt: **DOMParser-based, scripts-inert HTML parsing as an
+intentional, documented behavioral delta (CONST-P4)**; **build-time transformer
+validation for redefinition barrels (hard error)**; **a no-new-runtime-deps rule in
+the constitution**; and **UMD + wrapper deletion collapsing the deprecation surface**
+in the final slice.
+
+## Key Considerations
+
+- **keepScripts=true is load-bearing legacy, not a feature.** jQuery's own docs
+  treat keepScripts as unsafe; the fork inherits it silently. Any consumer doing
+  `bemDom.append(userHtml)` today gets script execution. Because Q2 decided
+  delete-the-wrapper-outright and the fork has a single consumer, this is the moment
+  to make parsing secure-by-default; preserving script execution would require
+  deliberately reimplementing a footgun in native code.
+- **No parser sanitizes event-handler attributes.** Whatever parse API replaces
+  parseHTML, `onclick="…"` attributes survive parsing and fire on insertion. That is
+  identical to v5-base behavior and to plain innerHTML semantics; the library must
+  document "HTML strings are inserted as HTML — sanitizing untrusted input is the
+  consumer's job" rather than pretend to sanitize.
+- **CSP is a design constraint, not an afterthought**: the import()-based loader must
+  work under `script-src 'self'` without `unsafe-eval`. Dynamic `import()` of same-
+  origin module URLs satisfies this (CSP3 treats module fetches under script-src; no
+  eval directive needed for real module graphs). `link rel=modulepreload` fetches are
+  governed by the same script-src policy — for a self-hosted module graph, 'self'
+  suffices. The current `loader_type_bundle` inline-`<style>` injection would require
+  `style-src 'unsafe-inline'` — another argument for its Q7 deletion.
+- **Build-time code execution is a trust boundary**: .deps.js files are evaluated as
+  code by vite-plugin-bem-levels (new Function). They are in-repo, review-gated files
+  — same trust class as the modules themselves. Acceptable, but the design doc should
+  state it explicitly ("deps files are code") and the S0 public-API inventory should
+  note that the exports map ("./*": "./*") currently makes EVERY repo file
+  importable, including build tooling — narrowing it is a hardening item.
+- **Override chains run with base-module rights and no guardrail**: a redefinition
+  file that exports something other than `export default function(prev)` breaks at
+  RUNTIME (TypError calling a non-function, or a silently mis-composed module), and
+  because platform matrices only differ by level, desktop can build while touch is
+  broken. The plugin already parses an `isRedefinition` signal
+  (vite-plugin-bem-levels.js:166-186) but generateBarrel() does not enforce it.
+- **Proportionality**: no permissions, no secrets, no network. CI (ci.yml) uses no
+  secrets beyond a node-version matrix; playwright webServer is localhost:5174;
+  vite.test.config.js injects only NODE_ENV. Nothing to design-guard beyond a note.
+
+## Options Explored
+
+**HTML parsing replacement (getJqueryCollection):**
+- *A. Range.createContextualFragment(html)* — true v5-base parity INCLUDING script
+  execution on insertion (the fragment's scripting flag comes from the document).
+  Rejected: preserves the footgun; also awkward for multi-root parsing ergonomics.
+- *B. `<template>` element (tpl.innerHTML = html; tpl.content)* — scripts are
+  created already-marked-unexecutable; content is a DocumentFragment, naturally
+  matching the future Element[] facade. Inert, native, no wrapping element in DOM.
+- *C. DOMParser().parseFromString(html, 'text/html')* — scripts parsed but NEVER
+  executed even after adoption into the main document; well-specified; returns a
+  full Document whose body children must be adopted (importNode/replaceChildren).
+- *D. detached-div innerHTML* — scripts don't run, but semantics for multi-root
+  strings (leading whitespace/text nodes get dropped in some cases) and the
+  "detached div" boilerplate make it strictly worse than B/C.
+
+**Runtime dependency for the native event/delegation engine:**
+- *A. vendored selector/delegation micro-lib (delegated-events, zepto-style closest)*
+  — rejected: C5 evergreen baseline already provides matches()/closest()/
+  composedPath()/Element.prototype.* needed for delegation; adding a dep contradicts
+  the zero-runtime-dep posture and expands audit surface for no capability.
+- *B. hand-rolled matcher over querySelectorAll + closest (recommended)* — the
+  delegated-binding self-match quirk (`bindDomElem.is(bindSelector)` at
+  i-bem-dom__events.js:82,133,147) must be preserved via element.closest/matches;
+  no new dependency.
+
+**Redefinition barrel safety:**
+- *A. runtime typeof check inside the generated barrel* — rejected: adds shipped
+  bytes for a build-time-authoring problem; error appears only on the affected
+  platform at runtime.
+- *B. build-time validation in the plugin (recommended)* — plugin already parses each
+  entry (parseModule, isRedefinition); generateBarrel should refuse to emit when a
+  non-base entry of a multi-entry module is not transformer-form.
+- *C. ESLint custom rule* — rejected: plugin is the single choke point; no new
+  tooling.
+
+## Recommendation
+
+1. **Parsing: option C (DOMParser) exposed through the internal DOM facade**
+   (`parseHtml(str) -> DocumentFragment | Element[]`), with template-element (B) as
+   the implementation detail if benchmarking prefers it. Spec a named test:
+   "scripts in HTML strings passed to append/prepend/insertBefore/insertAfter/init
+   do NOT execute". Document in MIGRATION.md + MIGRATION.ru.md (CONST-P4): "HTML
+   strings containing <script> no longer execute them; inline event-handler
+   attributes are preserved; sanitize untrusted HTML before passing it — the library
+   inserts, it does not sanitize." This belongs in the DOM-facade contract the
+   review says must be specified before S2/S4 — make scripts-inert a named property
+   of that contract.
+2. **Barrel validation: option B.** Hard build error, wording sketch:
+   `error: <level>/<block>.js redefines module '<name>' but is not a transformer —
+   expected: export default function(prev) { … } (CONSTITUTION.md CONST-P3).` Wire
+   into the platform-cleanup slice (S7) done-criteria, next to the CONST-P1-style
+   grep for window.* writes (expected empty after bundle-loader deletion).
+3. **Loader**: import()-based loader_type_js; delete loader_type_bundle (Q7) — the
+   CSP story then reads: "works under script-src 'self' (+ host-sources for any
+   cross-origin modules); no unsafe-eval, no unsafe-inline, no global callbacks".
+   Kill the `location.protocol === 'file:'` protocol-fixup hack
+   (loader_type_js.js:49) with the rewrite. modulepreload needs no special CSP
+   treatment beyond script-src for the module graph.
+4. **UMD + globals**: drop 'umd' from formats when the wrapper is deleted (S7/Q2);
+   UMD's global jQuery dependency dies with it. Record `bemCore` global and
+   `window._ycssjs` in the MIGRATION deprecation list. Result: zero window.*
+   writes or global contracts in the shipped library (verified today: only reads).
+5. **Supply chain**: dependency delta = remove jquery (peer + dev), remove vendored
+   test/dist fixtures in S2 (unaudited dead code), keep everything else. Adopt the
+   rule: **"No new runtime dependencies without a constitution amendment"** — either
+   as a new CONST-P6 clause in the platform-cleanup slice's constitution PR, or as
+   standing text in the design doc's Implementation Plan; recommend CONST-P6 since
+   the event engine is exactly the temptation it guards against.
+6. **CI/test harness**: no secrets exposure found; keep it that way (localhost
+   webServer, no env-var secrets; if future tooling needs tokens, GitHub secrets
+   only). No design work needed — documented here for completeness.
+7. **S0 hardening rider**: when the public-API inventory lands, note the
+   `"./*": "./*"` exports wildcard exposes every repo file (including build/) to
+   deep-import; recommend the inventory explicitly enumerate public paths and
+   narrow the map in the final slice (CONST-P4 inventory is the right vehicle —
+   not a security emergency, a hygiene item).
+
+## Constraints Identified
+
+- CONST-P4 requires the scripts-inert delta to be a documented migration, not a
+  silent change — bilingual (en+ru) MIGRATION notes are part of the parse-design
+  deliverable (review: "bilingual doc parity" — budget 1 REQ).
+- CONST-P1's grep blind spot (`(^|/)jquery/` filter hides desktop.blocks/jquery/*)
+  does not matter for security but the S7 window.*-write grep must NOT replicate
+  that pattern (exclude tests, include all three levels).
+- CONST-P2 (ESM-first): the UMD format is pre-existing, so deleting it is
+  constitution-positive; keeping it is the tension case — deletion recommended.
+- C5 (evergreen only) is what makes the zero-new-deps event engine viable.
+- Build-tool new Function() must remain Node-only: the plugin must never be imported
+  by browser-facing code (already true; the exports-map narrowing in #7 keeps it
+  true).
+- Human gate Q10 (pure-registry BEM events) affects the delegation engine design but
+  not its security properties either way (registry walk vs $.event.special both
+  execute only in-repo handler code).
+
+## Open Questions
+
+1. Does ANY in-repo spec rely on scripts-in-parseHTML executing? (Quick grep of
+   *.spec.js for `<script>` in HTML fixtures suggests no, but the events slice
+   should assert this mechanically via the new named test before S4 merges.)
+2. Should the DOM-facade parseHtml also strip event-handler attributes behind an
+   opt-in `safe` mode? Recommendation: NO (scope creep, consumer's job) — but the
+   design doc should record the decision so it is not relitigated.
+3. CONST-P6 (no-new-runtime-deps) wording and whether modulepreload/link injection
+   by the loader counts as a "dependency" (it does not — it's an API), to be settled
+   when the constitution PR lands in S7.
+4. If benchmarks (Q6: keep + migrate) inject HTML fixtures with scripts for timing
+   purposes, they must use a non-library path to do so — flag to the benchmarks
+   requirement owner.
+
+## Integration Points
+
+- **DOM facade contract (design doc, before S2/S4)**: parseHtml() scripts-inert
+  semantics + "library inserts, consumer sanitizes" boundary statement live here.
+- **Slice S2 (periphery)**: dom/idle/winresize migrations consume the facade;
+  test/dist purge lands here (supply chain item 5).
+- **Slice S3 (loader)**: CSP story, import() implementation, modulepreload note,
+  bundle deletion + bilingual MIGRATION.
+- **Slice S4/S5 (events)**: native delegation engine with zero new deps (option B);
+  self-match quirk parity spec (i-bem-dom__events.js:82,133,147).
+- **Slice S7 (platform cleanup + wrapper removal)**: barrel transformer validation,
+  UMD format deletion, window.* grep gate, CONST-P6 proposal, exports-map narrowing
+  rider.
+- **Slice S0 (prerequisites)**: public-API inventory records the exports wildcard
+  exposure; MIGRATION skeleton gets the scripts-inert entry stub.
+- **CONSTITUTION.md**: potential CONST-P6 (runtime deps) + the S7 done-criteria
+  greps (window writes, UMD absence) as sdd-checks.

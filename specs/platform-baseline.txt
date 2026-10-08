@@ -15,15 +15,10 @@ desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.js
 desktop.blocks/page/__conditional-comment/page__conditional-comment.bemhtml.js
 desktop.blocks/page/__conditional-comment/page__conditional-comment.bh.js
 desktop.blocks/page/page.deps.js
-desktop.blocks/ua/ua.js
 touch.blocks/page/__icon/page__icon.bemhtml.js
 touch.blocks/page/__icon/page__icon.bh.js
 touch.blocks/page/page.bemhtml.js
 touch.blocks/page/page.bh.js
 touch.blocks/page/page.deps.js
-touch.blocks/ua/__dom/ua__dom.deps.js
-touch.blocks/ua/__dom/ua__dom.js
 touch.blocks/ua/ua.bemhtml.js
 touch.blocks/ua/ua.bh.js
-touch.blocks/ua/ua.deps.js
-touch.blocks/ua/ua.js

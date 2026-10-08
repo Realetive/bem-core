@@ -1,0 +1,248 @@
+✓ bc-4qs · PRD review (arch-overhaul): requirements   [● P2 · CLOSED]
+Owner: opencode-gc-f2fc · Assignee: bem-core/gastown.polecat · Type: task
+Created: 2026-09-17 · Updated: 2026-09-17
+
+DESCRIPTION
+
+  You are one leg of a parallel PRD review for the bem-core v5 architecture   
+  overhaul.                                                                   
+                                                                              
+  Repo root: /Users/ryganin/gc/bem-core/bem-core (branch v5, already cloned). 
+  PRD to review: /Users/ryganin/gc/bem-core/bem-core/.prd-reviews/arch-       
+  overhaul/prd-draft.md                                                       
+  Project constitution (binding constraints): /Users/ryganin/gc/bem-core/bem- 
+  core/CONSTITUTION.md                                                        
+                                                                              
+  Standard instructions:                                                      
+                                                                              
+  • Read the PRD draft file (and CONSTITUTION.md) first.                      
+  • Explore the repo as needed to ground your findings (common.blocks,        
+  desktop.blocks, touch.blocks, build/).                                      
+  • Produce your FULL report in the bead notes of this bead (gc bd update or  
+  notes as you close) using the report structure below.                       
+  • Mail the coordinator bem-core/opencode-1 when complete: gc mail send bem- 
+  core/opencode-1 -s "PRD review leg  complete" -m " closed".                 
+  • Do NOT push code, do NOT modify repo files, do NOT touch unrelated work.  
+  Review only.                                                                
+  • Be specific: cite PRD sections and repo paths. Breadth over politeness.   
+                                                                              
+  Report structure (markdown):                                                
+                                                                              
+  #                                                                           
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ## Observations                                                             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  Leg focus: requirements. Stress-test the Goals and User Stories: are success
+  criteria, acceptance conditions, and failure modes testable and complete?   
+  For each Goal (G1-G7): what acceptance test would prove it done? Which      
+  requirements are missing, unverifiable, or overloaded? Check each User Story
+  is end-to-end verifiable.                                                   
+
+
+
+NOTES
+
+  # PRD Review (arch-overhaul): Requirements Leg                              
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  The PRD's goals are directionally sound and well-grounded in the repo's     
+  actual jquery ratchet (the 9 allowlist entries match grep -rl 'jquery' --   
+  include='*.deps.js' exactly), but as *requirements* they are not yet        
+  acceptance-testable in the C3 sense ("machine-checkable done-criteria"):    
+  most goals describe outcomes ("decomposed", "override-only in practice",    
+  "decision documented") without defining the checks that prove them. Two     
+  factual grounding errors — the missing v5-base tag and nonexistent          
+  "pointerevent normalization" code — undermine US5/C4 and Rough Approach     
+  slice 4 respectively. Three user stories (US1, US3, US5) are not end-to-end 
+  verifiable as written because artifacts they presuppose (a tagged base, a   
+  layer lint rule, bundle-content assertions, an export-inventory test) do not
+  exist and are not required by any goal. All grounding below verified by     
+  direct inspection of /Users/ryganin/gc/bem-core/bem-core (branch v5, rev    
+  f2ab61e).                                                                   
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  1. v5-base** tag does not exist (US5, C4, CONST-P5 unanchored).** git tag --
+  list returns empty. The PRD's parity strategy (Problem Statement, US5, C4:  
+  "diff behavior before/after against tag v5-base") has no comparison point,  
+  and no goal requires creating the tag. Add a slice-0 prerequisite ("create  
+  annotated tag v5-base at the pre-overhaul commit; record SHA in the design  
+  doc") or every parity requirement is unverifiable. This is the single       
+  blocking gap: G7 "each slice shippable" and C4 "behavior parity by default" 
+  both lean on the anchor.                                                    
+  2. **"Pointerevent normalization" is not in the codebase (Problem Statement 
+  bullet 5, G5, OQ3, Rough Approach slice 4).** Case-insensitive search finds 
+  zero pointer references in production blocks (common/desktop/touch). The    
+  only jquery __event_type_* redefinition in the fork is desktop.             
+  blocks/jquery/__event/_type/jquery__event_type_winresize.js ($.event.       
+  special.resize.preDispatch). No pointerclick/pointernative module exists —  
+  MIGRATION.md:48 references common.                                          
+  blocks/jquery/__event/_type/jquery__event_type_pointerclick.js, a path that 
+  does not exist. Consequences: G5's decomposition inventory lists a          
+  nonexistent concern; slice 4 is ~1 file of work, not a slice; OQ3           
+  presupposes false facts. Re-ground requirements on a mechanical inventory of
+  what i-bem-dom.js (1220 lines) actually contains: live collection/ranges,   
+  __events delegation, init lifecycle, DOM api surface — those are real.      
+  3. **G1 "zero internal jQuery" is under-specified: which consumers count?** 
+  CONST-P1's sdd-check greps only *.deps.js, but jquery usage exists outside  
+  that net: test/browser/entry.js:42 does import $ from 'jquery' (plus        
+  bem:jquery__config), the modules shim maps jquery: $, and desktop.          
+  blocks/jquery/__config plus winresize use $.event. As written, "allowlist   
+  reaches zero" can pass while entry.js still imports jquery — acceptance     
+  green, goal unmet (US1's "no jQuery in my bundle" false for the test bundle).
+  Define the completion predicate: (a) CONST-P1 with ALLOW="" passes AND (b)  
+  no bem:jquery/from 'jquery' imports outside the compat shim (or anywhere)   
+  AND (c) the browser test harness runs without the npm jquery peer.          
+  4. **US1 has no acceptance path: nothing requires bundle-content tests.** No
+  test asserts dist bundle contents (the Playwright suite runs the source-    
+  level vite test config, not dist), and no goal requires creating one.       
+  Suggested: CI check that dist/desktop/bem-core.mjs contains no jQuery       
+  signature (or a size budget vs the v5-base dist) + existing suite green.    
+  "Nothing regresses vs v5-base" also collides with gap #1.                   
+  5. **US3 is internally contradictory today.** "CI rejects any file in touch.
+  blocks that doesn't correspond to a common.blocks ancestor" — but touch.    
+  blocks/ua/ua.js and desktop.blocks/ua/ua.js have no common ancestor: common.
+  blocks/ua contains only templates (ua.bemhtml.js, ua.bh.js), docs, and __svg;
+  there is no common ua.js. The strict rule rejects the current tree. G6/US3  
+  must either be sequenced after slice 1 (env/ua collapse into common) with a 
+  transitional allowlist, or weakened; the PRD never states this dependency.  
+  6. **G6's checker is required but unspecified.** "Boundary is checked       
+  (lint/rule)" — no such rule exists (eslint.config.js has no layer rules). A 
+  goal mandating a new enforcement mechanism should carry its own acceptance: 
+  rule exists, wired into npm run lint/CI, demonstrably rejects a synthetic   
+  offending fixture, zero violations on the real tree at merge. Otherwise G6  
+  completion is prose-review-judged, violating C3's spirit.                   
+  7. **OQ8 (public API inventory) is a prerequisite, not an open question.**  
+  The exports map (. → ./dist/desktop/bem-core.mjs + a ./* wildcard) is the   
+  CONST-P4 enforcement surface and nothing pins it — no API contract tests    
+  exist. G5's "public surface pinned by API tests" (slice 7) needs an         
+  inventory produced *before* slices 4–6 touch i-bem-dom. Promote "produce and
+  test-pin the v5-base public export inventory" to an explicit early-slice    
+  requirement.                                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  **Per-goal acceptance tests:**                                              
+                                                                              
+  • **G1:** (a) CONST-P1 sdd-check with ALLOW="" passes; (b) grep for         
+  bem:jquery/'jquery' imports across common.blocks/desktop.blocks/touch.      
+  blocks/build/test returns only the compat shim or nothing; (c) full         
+  Playwright suite green; (d) dist bundle contains no jquery. Production      
+  bem:jquery import sites today: i-bem-dom.js:14, __events/i-bem-dom__events. 
+  js:8, __events/_type/*_**type_**bem.js:8, __**events/_**type/*_type_dom.js:6,
+  dom/dom.js:6, idle/idle.js:7, touch.blocks/ua/ua.js:7 — 7 files + winresize +
+  __config, matching the 9 deps entries. Verifiable once gap #3 is fixed.     
+  • **G2:** production bem:ua consumers are exactly two files — desktop.      
+  blocks/jquery/__event/_type/jquery__event_type_winresize.js:5 and touch.    
+  blocks/ua/__dom/ua__dom.js:7 — both inside code G1/G6 already deletes or    
+  rewrites. Note: there is **no behavioral spec for ua today** (only ua__svg  
+  and tmpl-specs), so "preserving legitimate UA-driven branches with tests"   
+  means *writing new tests*, which should be said explicitly. Acceptance: no  
+  navigator.userAgent parsing outside the documented-exception module; ua     
+  export gone or explicitly deprecated.                                       
+  • **G3:** loader_type_js (62 lines, export default { get }) and             
+  loader_type_bundle (106 lines, zero imports) are both imported by           
+  build/platforms/desktop.js:61-62 — both are in the dist surface, so deleting
+  _bundle is a CONST-P4 change requiring a MIGRATION.md entry and a dist-     
+  export diff. Acceptance: existing loader_type_js.spec.js green against the  
+  new impl; new spec pins error/timeout semantics; US6's loader_type_js.      
+  get(url) API shape is real (verified).                                      
+  • **G4:** "decision documented" is doc-existence-verifiable only. Add a     
+  mechanical leg: inherit.spec.js remains green unchanged — the regression    
+  bound for options (a)/(b). If (c) native-class authoring: breaking by       
+  definition, CONST-P4 triggered, acceptance must include MIGRATION.md section +
+  new spec.                                                                   
+  • **G5:** testable as: dist export inventory identical before/after; public 
+  identifiers (init/declMix/onSetMods semantics via i-bem.vanilla.js)         
+  unchanged; full browser suite green. Currently unverifiable — no export-    
+  inventory test exists (gap #7).                                             
+  • **G6:** see gaps #5/#6. Acceptance = new lint rule + CI wiring + clean    
+  tree + rule's own fixture test.                                             
+  • **G7:** "≤12 requirements" countable from each slice spec (mechanical);   
+  "independently mergeable" needs stated proof: main builds + full suite green
+  per merge + MIGRATION.md diff non-empty where user-visible. Testable once   
+  gap #1 (tag) exists.                                                        
+                                                                              
+  **Overloaded goals:** G1 bundles "migrate 9 consumers" + "delete wrapper" + 
+  "escape-hatch decision (OQ1)" — the last is a design-deliverable gating the 
+  final slice; split it so G1 completion isn't blocked by an unrelated        
+  decision. G5 bundles decomposition + init-registry rearchitecture (OQ5); the
+  latter is behavior-adjacent and deserves its own requirement.               
+                                                                              
+  **Missing requirements (owned by no goal):**                                
+                                                                              
+  • Create v5-base tag (gap #1).                                              
+  • Test-harness de-jquery (gap #3) — entry.js must be in some slice's scope  
+  or US1 fails silently.                                                      
+  • Cross-platform test story: playwright.config.js is chromium-only headless 
+  while the fork ships a touch platform (build/platforms/touch.js, touch.     
+  blocks). Either declare chromium-only parity in C4 or add a webkit/mobile-  
+  emulation leg; currently unstated.                                          
+  • OQ9 (benchmarks) blocks slice 2 — benchmarks.blocks/page/page.deps.js is  
+  in the allowlist, so slice 2's spec must resolve it; treat as a slice-2     
+  input, not an idle question.                                                
+  • Legacy relics adjacent to G6: desktop.blocks/page/__conditional-comment/  
+  (IE conditional comments) and page.examples/40-es5-shims.bemjson.js conflict
+  with C5 (no IE/legacy); nothing disposes of them, and the G6 checker must   
+  classify them.                                                              
+                                                                              
+  ## Observations                                                             
+                                                                              
+  • Facts that check out: 9 jquery .deps.js consumers match the allowlist     
+  exactly (sdd-check grep reproduced); i-bem-dom.js = 1220 lines; inherit.    
+  vanilla.js = 121 lines; dom.js = 111 lines; engines node >=20; eslint ^10 / 
+  vite ^8; exports "." → dist/desktop/bem-core.mjs (OQ8 premise correct);     
+  benchmarks.blocks exists (b1, b2, page).                                    
+  • jQuery is a **peerDependency** (^4.0.0 per MIGRATION.md:54), dependencies 
+  is empty — US1's accounting should treat it as a peer.                      
+  • touch.blocks/ua/ua.js imports bem:jquery at line 7: slice 1 (env/ua) and  
+  slice 2+ (jquery) are coupled through this file; slice 1 cannot *finish* ua 
+  while touch ua needs jquery. Ordering is right but the coupling should be   
+  explicit — design legs should check whether slice 1 delivers a jquery-free  
+  touch ua or the file splits across slices.                                  
+  • loader_type_bundle.js has zero imports; its only in-repo consumers are    
+  build/platforms/desktop.js and tests — OQ6 is answerable now: in-repo no;   
+  external unknown (needs MIGRATION.md notice if deleted).                    
+  • The ua fork is two different migrations: desktop ua.js is 34 lines of     
+  jQuery-1.8-era browser sniffing ({chrome|webkit|opera|msie|mozilla,         
+  version}); touch ua.js is 204 lines already doing feature detection (video, 
+  svg, connection). Acceptance criteria should treat them separately.         
+  • specs/ exists but is empty — US4's "machine-checkable done-criteria" has a
+  home but no spec-format convention yet; the design doc must define it (C3   
+  gestures, never requires).                                                  
+  • MIGRATION.md already carries jquery peer-dep and removed-method guidance —
+  slice specs can reference rather than rewrite.                              
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  High confidence on grounding claims (grep/ls/git executed directly against  
+  the v5 worktree, rev f2ab61e). High confidence on the two critical factual  
+  findings (missing v5-base tag; absent pointerevent code — both verified by  
+  exact search). Medium confidence on the sufficiency of proposed acceptance  
+  tests — that is judgment, and the design legs may legitimately reshape      
+  criteria. I did not run the Playwright suite or build the dist (read-only   
+  leg), so statements about test-coverage gaps rest on reading                
+  playwright.config.js, test/browser/entry.js, and the absence of dist-content
+  assertions, not on observed runs.                                           
+
+
+
+METADATA
+  coordinator: bem-core/opencode-1
+  gc.work_outcome: shipped
+  review_id: arch-overhaul
+  review_leg: requirements
+  review_phase: prd
+
+BLOCKS
+  ← ✓ bc-a0j: input convoy for bc-4qs ● P2
+

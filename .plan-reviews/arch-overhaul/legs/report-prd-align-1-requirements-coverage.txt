@@ -1,0 +1,96 @@
+# PRD-align-1 · requirements-coverage (review_id=arch-overhaul, review_phase=prd-align-1, review_leg=requirements-coverage)
+
+## Summary
+
+Walked all 23 requirements (G1–G7, C1–C6, binding amendments Q1–Q10) from
+`.prd-reviews/arch-overhaul/prd-draft.md` against design-doc baseline v1
+(`.designs/arch-overhaul/design-doc.md`), requirement by requirement.
+
+Result: **19 COVERED, 4 PARTIAL, 0 MISSING** — 2 [must-fix], 3 [should-fix].
+
+The baseline is strong: all ten Q-answers are concretely landed (anchor tag in
+S0, outright wrapper deletion D-1, full public-API contract in Interface,
+inherit freeze D-2, scoped env + one-release ua alias, benchmarks in S2,
+bundle-loader deletion D-1/Q7, chromium-only matrix D-15, one 6.0.0 D-12,
+pure-registry BEM events D-3 with the three parity caveats), and the slice
+discipline (7 slices, all ≤12 REQ, per-slice MIGRATION + allowlist deltas) is
+explicit and machine-checkable.
+
+The two must-fixes are cheap documentation reconciliations, not design rework:
+(1) PRD G5/OQ3's "pointerevent normalization" is absent from the design doc
+with no reconciliation — repo grep shows no pointer code exists in the fork
+@ f2ab61e, so the PRD premise is stale and the design doc must say so;
+(2) PRD G3's "timeout" sub-clause of loader semantics is never dispositioned —
+repo grep shows loader_type_js has no timeout today, so again a reconciliation
+note suffices. Neither blocks the design's soundness; both would strand a
+future requirements-walker (plan-review, create-beads) exactly where I hit the
+wall.
+
+## Coverage matrix (requirement → verdict → design-doc section)
+
+| Req | Verdict | Design-doc anchor (section → quote) |
+|---|---|---|
+| **G1** zero internal jQuery | **COVERED** | Exec Summary → "9 entries → −1 (S1) −3 (S2) −2 (S4) −3 (S5) = **∅ after S5**" (1+3+2+3=9, matches CONSTITUTION.md allowlist exactly); Slice series S6 → "`common.blocks/jquery` + `desktop.blocks/jquery/*` deleted; jquery dev+peer deps gone"; D-1 → "Delete the jquery wrapper outright; no compat shim"; DOM type contract → "`$(node).bem()` plugin DELETED (S5/S6)" |
+| **G2** ua → environment detection | **PARTIAL** | Key Components 1–2 + Interface → env/ua surface (env module scoped to audited consumers; ua Proxy alias; wishlist → Non-Goals). Gap: "preserving the few legitimate UA-driven branches with documented justification and tests" is only implicit — see F3 |
+| **G3** loader on native ESM | **PARTIAL** | Key Components 7 + S3 row + Loader surface → "`loader(url, success?, error?)` = `import(url)` + callback shim"; bundle loader → "deleted (bilingual note)" (Q7). Gap: PRD's "timeout" sub-clause never dispositioned — see F2 |
+| **G4** inherit decision | **COVERED** | D-2 → "`inherit` frozen (Q4-a); native-class options a named future phase"; Exec Summary → "zero code change, pinned by existing specs"; S0 → "inherit freeze recorded". Migration story = no-op ("zero code change"); wildcard nit folded into F5 |
+| **G5** i-bem-dom decomposed | **PARTIAL** | Key Components 6 → decomposition "`params-store / entity-index / collection-cache / dom-facade / find-engine / events-dom / events-bem / init-lifecycle` behind the frozen public surface"; public-surface invisibility via Design position 2 + exports narrowing + API-pin test. Gap: "pointerevent normalization" absent with no reconciliation — see F1 |
+| **G6** platforms override-only | **COVERED** | Exec Summary → "override-only by construction: a new CONST-P6 ancestor-existence check with a shrinking baseline (3 → ∅)"; Key Components 9 (plugin transformer-form validation), 13 (CONST-P6); Data Model 2 → normative override glossary; S1/S6 rows |
+| **G7** each slice shippable | **COVERED** | Slice series table (S0–S6, REQ est 11–12/8–12/6–8/4–6/8–12/8–10/8–10 — all ≤12); Exec Summary → "each independently mergeable to branch `v5` with lint/unit/browser tests green"; Design position 6; Implementation Plan → "one `### <slice-id> <title>` section per slice in MIGRATION.md + MIGRATION.ru.md in the same commit"; CONST-P1 Δ column per slice |
+| **C1** CONSTITUTION law (P1–P5) | **PARTIAL** | P1: Key Components 13 + Δ column + Design position 6 ("each slice PR edits the constitution allowlist in the same commit"); P2: D-14 (UMD dropped, no new UMD/CJS); P3: CONST-P6 + glossary; P4: API-pin test + Design position 3. Gap: P5's "MPL-2.0 notices intact" never mentioned despite S6 deletions/README rewrite — see F4 |
+| **C2** strangler discipline | **COVERED** | Slice table deps column (periphery S1/S2/S3 parallel off S0, core S4/S5 last, deletion S6); Design position 6 → "Every slice leaves `v5` buildable and tests green (C2)". (PRD says "main"; v5 is the fork mainline — coherent) |
+| **C3** machine-checkable done-criteria | **COVERED** | Implementation Plan → "Done-gate (machine-checkable, per slice): `npm run lint && npm test && ...` + the slice's grep predicates (allowlist state, budget green) + constitution sdd-checks"; Key Components 10 (bundle gate), 13 |
+| **C4** behavior parity by default | **COVERED** | Design position 3 → "Behavior parity by default, documented breaks allowed (C4/CONST-P4): each signature change ships with a bilingual MIGRATION entry in the same slice"; D-11 (parseHtml break documented + escape hatch); Loader surface (ES-only shift documented) |
+| **C5** Node ≥20 / evergreen only | **COVERED** | S0 → "Node floor pinned"; CI wiring → "Node matrix aligned to the picked floor ([20,24])"; no polyfill additions proposed; env/ua legacy fields die (msie etc.) |
+| **C6** vision-only convoy | **COVERED** | Doc ships design + slice plan + bead-DAG spec only; no implementation code; slice series is future convoys |
+| **Q1** anchor v5-base@7a9e932 | **COVERED** | S0 → "tag `v5-base`@7a9e932; API inventory + pin test"; Problem Statement → "matching tag `v5-base` (7a9e932)". ("Annotated" tag attribute is slice-spec detail) |
+| **Q2** delete wrapper outright | **COVERED** | D-1 → "no compat shim; peer dep removed (Q2) … `$(node).bem()` removal documented"; S6 row; Risks → "MIGRATION notes name every removal" |
+| **Q3** public API contract in doc | **COVERED** | Interface → package.json exports + Root barrel + "Supported deep-import inventory (the pinned set)" + DOM type contract ("native `Element` or `Element[]`"); all six public block families (i-bem, i-bem-dom, events, dom, loader, env/ua) + `./build/plugins/*`; Design position 2 → "all existing public deep-imports keep working". Nit → F5 |
+| **Q4** inherit frozen | **COVERED** | D-2; Exec Summary; S0 → "inherit freeze recorded"; "named future phase" explicit |
+| **Q5** env scoped, alias, exception | **COVERED** | Key Components 1 → "scoped strictly to the audited consumer inventory (touch `ua__dom`)"; "RTL/passive-listeners/input-modality: Non-Goals until a consumer exists (Q5)"; Key Components 2 → "one-release Proxy"; ua surface → "removed fields (`msie`, …) warn once and return `undefined`"; S2 → "winresize deleted"; barrel comment → "S1 (Q5 exception)" |
+| **Q6** keep + migrate benchmarks | **COVERED** | S2 → "dom + idle + winresize + benchmarks off jquery"; Key Components 11 → bench project B1–B6, "the done-gate for S4/S5" |
+| **Q7** delete bundle loader, bilingual note | **COVERED** | S3 → "`loader_type_bundle` deleted (bilingual note)"; Key Components 7 → "(dead ym format, Q7)" |
+| **Q8** chromium-only + touch-emulated S1 | **COVERED** | D-15 → "Chromium-only + desktop-parity verification matrix; touch-emulated Playwright project from S1 (Q8)"; S1 row → "touch-emulated Playwright project"; Risks → "Touch-emulated Playwright project is S1 acceptance (Q8)"; CI wiring S1 |
+| **Q9** one 6.0.0, human-cut, repo.url | **COVERED** | D-12 → "One 6.0.0 at the end; version stays 5.0.0 through the series (Q9) … human cuts the release"; S0 → "`repository.url` fix" |
+| **Q10** pure-registry BEM events + 3 caveats | **COVERED** | D-3 → "Pure-registry BEM events (Q10), three caveats as named parity tests"; Key Components 5 → "positional trigger args, `flags.fns` per-emit dedup, `propagationStoppedDomNode` containment rule"; S5 row → "three Q10 parity caveats as named tests" |
+
+## Findings
+
+### F1 [must-fix] — G5 / PRD-OQ3: "pointerevent normalization" absent from the design doc, no reconciliation
+- **PRD trace:** G5 ("The monolith split into cohesive internal modules (live collection/ranges, event delegation, **pointerevent normalization**, init lifecycle)"); PRD Open Question 3 (pointerevent normalization ownership — "where does it live … does it remain public?").
+- **Design-doc anchor:** Key Components 6 — the decomposition list `params-store / entity-index / collection-cache / dom-facade / find-engine / events-dom / events-bem / init-lifecycle` contains no pointer concern; the delegation-engine description (Key Components 4) maps only "focus/blur → focusin/focusout"; the design doc's own Open Questions (1–9) do not mention it; zero occurrences of "pointer" in the whole document.
+- **Repo evidence (fork @ f2ab61e, grep-verified):** `rg -ln "pointer" common.blocks/ desktop.blocks/ touch.blocks/ build/` matches only unrelated files (`functions.*.md` prose, the vite plugin). `i-bem-dom.js` has none. **No pointerevent-normalization code exists in the fork** — the PRD premise (2016 upstream memory) is stale, and the design doc's omission is factually correct but undocumented.
+- **Why must-fix:** a requirements-walker in plan-review/create-beads hits this exact wall: stated G5 sub-requirement with no design coverage and no explanation. C4 parity could also be silently mis-scoped if pointer behavior is assumed to exist.
+- **Suggested fix (one line):** in Key Components 6 (or beside the numbering note at the top), add: "PRD G5/OQ3 'pointerevent normalization': grep-verified absent from the fork @ f2ab61e — nothing to decompose, OQ3 void; if pointer normalization is ever needed it is an events-dom engine mapping-table concern (cf. focus/blur → focusin/focusout)."
+
+### F2 [must-fix] — G3: loader "timeout" sub-clause never dispositioned
+- **PRD trace:** G3 — "`loader_type_js` semantics (async script load, error reporting, **timeout**) provided via `import()`-based implementation".
+- **Design-doc anchor:** Key Components 7 + Interface → Loader surface — "`loader(url, success?, error?)` → promise of module namespace"; async ✓, error ✓ (callback + `import()` rejection + bilingual note); "timeout" appears nowhere in the design doc.
+- **Repo evidence:** no `timeout` anywhere in `common.blocks/loader/`; current `loader_type_js` exposes `get(path, success, error)` + a loading queue only — **no timeout semantic exists today**. The PRD sub-clause is itself void.
+- **Why must-fix:** a stated semantic in the binding requirement inventory is uncovered; either cover it or explicitly reconcile it.
+- **Suggested fix (one sentence in Loader surface):** "PRD G3 lists 'timeout': `loader_type_js` never exposed a timeout (repo-verified) — requirement void; if a timeout is wanted it is a new feature (Non-Goal) or a one-line `Promise.race` wrapper to decide in the S3 spec."
+
+### F3 [should-fix] — G2: retained UA-driven detection not classified or justified
+- **PRD trace:** G2 — "preserving the few legitimate UA-driven branches with **documented justification and tests**".
+- **Design-doc anchor:** Key Components 1 + Interface → env/ua surface — lists `platform/ios/android/browser/screenSize/svg` (memoized) and `width/height/landscape` (live) without classifying which are UA-string-derived vs capability-probed, and without a justification/test requirement for the retained UA-derived getters. Q5 scoping itself is fully covered.
+- **Suggested fix:** one sentence in env/ua surface classifying the getters (e.g. `platform/ios/android/browser` = UA-derived, retained because touch `ua__dom` consumers read them — justification recorded; `svg/screenSize/width/height/landscape` = capability/live probes) + an S1 TESTS entry "each UA-derived getter: documented justification + dedicated unit".
+
+### F4 [should-fix] — C1/CONST-P5: MPL-2.0 notice preservation unmentioned
+- **PRD trace:** C1 — "CONST-P5 hard fork at `v5-base` (MPL-2.0 notices intact)"; CONSTITUTION.md CONST-P5 — "Keep LICENSE.txt and file-level MPL notices intact."
+- **Design-doc anchor:** Key Components 13 "Constitution checks" enumerates the P1 final predicate, CONST-P6, and the doc-parity fence — no P5; the S6 row (mass file deletion + "README/README.ru rewrite") never mentions license notices.
+- **Suggested fix:** add to Key Components 13 (or the S6 row): "CONST-P5: LICENSE.txt + file-level MPL-2.0 notices preserved through S6 deletions/rewrites; S6 done-gate includes a notices-intact grep."
+
+### F5 [should-fix] — Q3/G4: `./common.blocks/*` wildcard vs "pinned" deep-import inventory
+- **PRD trace:** Q3 ("deep-imports stay public"; the public-blocks inventory); G4 (inherit frozen as internal detail).
+- **Design-doc anchor:** Design position 2 — "The exports map narrows `"./*"` → `"./common.blocks/*"` … making non-public paths unresolvable" vs Interface → "Supported deep-import inventory (the pinned set)", which does not include `inherit/inherit.vanilla.js` (still resolvable under the wildcard, so "public by inventory" overstates the mechanical boundary).
+- **Suggested fix:** one clarifying sentence: the wildcard is a deliberate compatibility superset; the pin test + CONST-P4 police the pinned inventory; state explicitly whether `inherit`'s deep-import path is in the public contract (pin it) or internal-but-tolerated until a future narrowing.
+
+### Verified non-findings (no action)
+- Allowlist arithmetic 1+3+2+3=9 matches the CONSTITUTION.md sdd-check allowlist entry-for-entry.
+- "main vs v5" (C2) naming is coherent — v5 is the fork mainline; design cites C2 explicitly.
+- `$.fn.bem` timing ("S5/S6" in DOM type contract, "`$.fn.bem` off" in S5 row) is consistent with allowlist ∅ at S5.
+- Q1 "annotated" tag attribute is slice-0 spec detail, not a design-doc gap.
+
+## Confidence
+
+**High.** Both inputs read in full; every verdict anchored to named sections with quotes; the 9-consumer allowlist cross-checked against CONSTITUTION.md @ f2ab61e (exact match); pointer-code and loader-timeout absence verified by repo grep across `common.blocks/`, `desktop.blocks/`, `touch.blocks/`, `build/`. Residual uncertainty: pointer-related behavior hidden in `dist/` artifacts or generated code was not inspected (sources only) — does not change the reconciliation recommendation; F1/F2 remain correct as documentation duties even if such code existed.

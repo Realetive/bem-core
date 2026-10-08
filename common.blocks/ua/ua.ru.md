@@ -1,44 +1,17 @@
-# ua
+# ua (устаревший алиас)
 
-Блок служит для сбора данных о браузере пользователя.
+Живая пересылка в `env`. Удаляется в 6.1.0.
 
-## Обзор
+## Status
 
-### Элементы блока
+Устарел — используйте `import env from 'bem:env'`.
 
-| Элемент | Способы использования | Описание |
-| ------- | --------------------- | -------- |
-| <a href="#elems-svg">svg</a> | `deps` | Проверяет, поддерживает ли браузер формат SVG. |
+## What's forwarded
 
-### Публичные технологии блока
+`ua`, `platform`, `ios`, `android`, `bada`, `wp`, `other`, `browser`, `opera`, `chrome`, `screenSize`, `svg`, `width`, `height`, `landscape`
 
-Блок реализован в технологиях:
+## What's removed (warns once)
 
-* `bh.js`
-* `bemhtml`
+`msie`, `webkit`, `safari`, `mozilla`, `version`, `iphone`, `ipad`, `dpr`, `flash`, `connection`, `video`
 
-## Описание
-
-Блок подключает инлайновый скрипт, добавляющий тегу `<html>` `CSS`-классы, указывающие, включен ли JavaScript – `ua_js_no`/`ua_js_yes`.
-
-Не имеет визуального представления на странице.
-
-Используется внутри блока [page](https://github.com/bem/bem-core/blob/v2/common.blocks/page/page.ru.md) и самостоятельно подключать его к странице обычно не требуется.
-
-<a name="elems"></a>
-
-### Элементы блока
-
-<a name="elems-svg"></a>
-
-#### Элемент `svg`
-
-Элемент подключает инлайновый скрипт, добавляющий тегу `<html>` `CSS`-классы, указывающие, поддерживается ли SVG – `ua_svg_no`/`ua_svg_yes`.
-
-Не имеет визуального представления на странице.
-
-Для использования включите элемент в файл зависимостей `deps.js` блока, которому требуются данные о поддержке SVG:
-
-```js
-({ shouldDeps : { block : 'ua', elem : 'svg' } })
-```
+See MIGRATION.md → `### S1` for migration guide.

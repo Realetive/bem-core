@@ -1,0 +1,292 @@
+# Plan-review-2 · scope-creep
+
+review_id=arch-overhaul · review_phase=plan-review-2 · review_leg=scope-creep
+Subject: .designs/arch-overhaul/design-doc.md @ plan-review-1 state (598L). Inputs read
+fully: prd-draft.md (incl. human Q1–Q10), CONSTITUTION.md, prd-align rounds 1–3,
+review-round-1. Repo evidence read-only @ f2ab61e (branch v5).
+
+## Summary
+
+The plan is scope-tight for a strangler series with binding machine-check demands
+(C1/C3/G6/US3): **0 must-cut, 6 should-cut, 1 defer**, plus ~30 explicit acquittals.
+The over-engineering lens produced **zero cut findings** — every machinery candidate
+(CONST-P6 baseline, bundle gate, TESTS contract, MIGRATION ledger, skip/preview staging,
+shim-map ratchet, plugin hard error, WeakMap, decomposition granularity) traces to a
+binding requirement (G6/US3, C3/CONST-P1, G7/CONST-P4, Q6, C4) or replaces a
+known-defective existing mechanism (the >400 magic floor). The genuine creep is
+concentrated in S0 (at-cap) and S3 (smallest slice): a deps-manifest lint no requirement
+carries; a dead-code cleanup scheduled as a named outcome; a stale "Node floor pinned"
+phrase contradicting the already-applied NG-F7 cut; and a one-release compat bridge that
+contradicts the hard-fork delete-outright culture (D-1) while CONST-P4/US6 are satisfiable
+with a MIGRATION line. Two smaller items: the B6 startup bench scenario (redundant with
+the bundle byte gate + B1) and two unspecified-polish mentions (scope explicit-throw,
+_buildModValRE memoization). All plan-native deferrals (inherit, absolute budgets,
+tree-shaking, content redesign, keyboard convoy) verified NOT load-bearing for any slice.
+Net REQ effect: S0 11–12 → ~10–11 (cap pressure relieved), S3 4–6 → ~4–5; no slice grows.
+
+## Scope matrix
+
+| lens | verdict | findings | acquittals (kept) |
+|---|---|---|---|
+| 1 Gold-plating | 5 findings | SC-1 deps lint (S0); SC-2 converter unification→defer (S0); SC-4 loader re-export bridge (S3); SC-5 B6 scenario (S2); SC-6 scope throw clause (S4/S5 contract) | generated entries+parity assertion; two-directional ratchets; doc-parity fence; barrel cap; Proxy alias form; UA-getter units; bench B1–B5+capture; focus-delegation tests; four parity tests; bem:loader canonical switch; README section; docs API pass; notices grep |
+| 2 Over-engineering | **0 findings** | — | CONST-P6 check+baseline; bundle gate (ratchet+staging); TESTS 5-item contract; per-slice MIGRATION ledger; skip/preview guard; shim-map ratchet+accounting; compile-once matchers; WeakMap; plugin hard error; 8-module decomposition |
+| 3 Premature optimization | 1 finding | SC-7 _buildModValRE memo mention | bench ≤1.10× thresholds; shared closest-walk; lazy memoized env getters; O(scopes×types) claim |
+| 4 Defer candidates | 1 finding + 1 stale-text cut | SC-2 defer; SC-3 "Node floor pinned" stale phrase | repository.url@S0 (Q9); exports narrowing@S0 (D-6); touch-emulated@S1 (Q8); doc/README/notices@S6; all plan deferrals verified non-load-bearing |
+
+## Findings
+
+### SC-1 [should-cut] `.deps.js` schema+resolution lint (S0)
+- Anchor: Slice table S0 row — "`.deps.js` schema+resolution lint + entity-converter
+  unification"; Data Model 1 — "`.deps.js` stays a **documented manifest, never a build
+  input** — schema+resolution lint added".
+- Slices: S0.
+- PRD decision: no requirement carries a checker over a manifest the design itself
+  excludes from the build (D-9). PRD Non-Goals ("No bundler/CI changes beyond what
+  architectural slices require"); the manifest's only load-bearing role — CONST-P1
+  ratchet substrate (Data Model 5) — is already consumed by the existing grep. The lint
+  guards a doc artifact with zero in-repo mechanical consumers (hard fork, single
+  consumer, Q2).
+- Suggested edit: delete the lint clause from the S0 cell and Data Model 1; D-9 keeps
+  "documented manifest, never a build input" as prose. Manifest hygiene, if wanted, is
+  one sentence in S6 release prep — not a fence-slice REQ.
+
+### SC-2 [defer] entity-converter unification (S0 → S6 ride-along)
+- Anchor: same S0 cell + Data Model 1 — "the two divergent entity-converters unified
+  (dead `bemEntityToModuleName` removed)".
+- Slices: S0 → S6.
+- Repo-verified: `bemEntityToModuleName` is defined and exported only
+  (`build/plugins/vite-plugin-bem-levels.js:280` def, `:669` export); zero production
+  call sites. "Unification" = deleting dead plugin-internal code.
+- PRD decision: no requirement names it; dead-code removal is release-prep hygiene, not
+  fence-slice scope. S0 is at-cap (11–12) and nothing downstream depends on it — doing
+  it early buys nothing.
+- Suggested edit: S0 cell drops the phrase; S6 outcome cell gains "dead plugin-internal
+  `bemEntityToModuleName` deleted (ride-along)" — or fold into S0's plugin-validation REQ
+  as incidental cleanup if S0 has slack after SC-1/SC-3.
+
+### SC-3 [should-cut] stale "Node floor pinned" in S0 outcome (doc fix)
+- Anchor: Slice table S0 row — "Node floor pinned"; contradicts the CI wiring section —
+  "Node matrix unchanged — the existing [20] entry already pins the ≥20 floor (current
+  matrix [20,22])". prd-align-2 NG-F7 already cut the matrix change; package.json
+  engines ≥20 verified @ f2ab61e.
+- Slices: S0.
+- PRD decision: NG-F7 (applied): "Node matrix realignment [20,24] required by no slice".
+  The S0 phrase is a pre-NG-F7 leftover; as written it schedules a no-op or an
+  already-cut change.
+- Suggested edit: delete "Node floor pinned" from the S0 cell (the CI-wiring sentence
+  already records the no-change position).
+
+### SC-4 [should-cut] loader deprecated re-export bridge (S3)
+- Anchor: KC 7 — "the old mod path becomes the one-release deprecated re-export
+  (once-warn; callable shape preserved)"; S3 row closure predicate "deprecated re-export
+  present with once-warn"; TESTS S3 "deprecated deep-import re-export once-warn";
+  deep-import inventory "the `loader_type_js` mod path rides as the deprecated
+  one-release re-export".
+- Slices: S3.
+- PRD decision: US6 is satisfied by the "or" branch ("follows a documented one-line
+  migration to `import()`"); CONST-P4 allows shrink "inside a slice whose spec documents
+  the migration" — a MIGRATION line, not a bridge; Q2/D-1 set the hard-fork
+  delete-outright culture for compat surfaces. In-repo consumers verified: only the
+  platform hand lists + spec harness reference the old path (switched mechanically at
+  S3); the bridge serves hypothetical external deep-importers — the population Q2
+  declares empty.
+- Cost: bridge + once-warn machinery + a dedicated once-warn test inside the series'
+  smallest slice (4–6 REQ).
+- Suggested edit: delete the old mod path outright with a bilingual MIGRATION entry
+  naming old/new paths (callable form preserved by the new root module; promise return
+  additive — already in the Loader surface); closure predicate becomes "zero
+  `loader_type_js` references repo-wide (barrel, generated entries, harness entry.js
+  switched; spec converted)"; drop the once-warn test item. This is a variant of
+  SQ-SF-5's option (a) (canonical switch kept, bridge dropped), not a rollback.
+- Counterweight (why medium confidence): upstream/CONST-P4 MIGRATION culture tolerates
+  one-release bridges, and the coordinator preferred bridge-adjacent option (a) in
+  round 1. If bridge culture is weighed heavier, keep — but then it is a deliberate
+  compat affordance, not a requirement.
+
+### SC-5 [should-cut] bench scenario B6 "startup" (S2)
+- Anchor: KC 11 — "six scenarios B1–B6 (init throughput, delegated dispatch, BEM emit,
+  live-collection, destruct no-leak via heap delta, startup)"; S2 row "bench project
+  B1–B6"; TESTS S2 "bench B1–B6".
+- Slices: S2.
+- PRD decision: Q6 anchors the harness as "the perf harness for the later i-bem-dom
+  rework" (= S4/S5). B1–B5 each measure a path a slice changes (B2→S4 engine + WeakMap
+  risk row; B3→S5 registry; B4→collection/WeakMap; B5→D-5 leak-by-construction, its only
+  verifier). B6 startup measures payload bytes + init — both already gated (bundle byte
+  caps; B1).
+- Suggested edit: five scenarios B1–B5 in KC 11, the S2 row, and TESTS S2. (If S6 wants
+  a startup smoke number, it can ride the final bench run — not a scenario.)
+
+### SC-6 [should-cut] `bemDom.scope/doc/win` "explicit throw" polish (unrequested behavior tightening)
+- Anchor: Interface → DOM type contract — "lazy getters (`body`/`document`/`window`),
+  never null; explicit throw if body genuinely absent (replaces silent-null footgun)".
+- Slices: S4 (scope anchor decision, OQ-3) / S5 (decomposition makes them lazy).
+- Repo-verified today: `bemDom.scope = $('body')` at module eval (`i-bem-dom.js:1215`;
+  `scope : null` default `:938`) — silent empty on missing body.
+- PRD decision: C4 "behavior parity by default … unless a slice's spec documents a
+  migration". The throw is an observable change on an edge path that no requirement
+  demands (US1 "nothing regresses"; no user story reads scope-before-body). As written
+  it is polish plus an undocumented break.
+- Suggested edit: either (preferred) drop the throw clause (lazy getter preserves
+  today's empty-body behavior), or keep the throw AND enumerate it in the owning
+  slice's MIGRATION cell as a C4 break. Do not leave it as silent polish.
+
+### SC-7 [should-cut] `_buildModValRE` memoization mention (S5)
+- Anchor: KC 6 — "`_buildModValRE` memoized".
+- Slices: S5 (decomposition).
+- Repo-verified: `i-bem-dom.js:850` builds `new RegExp` per call today; no bench
+  scenario measures mod matching (B1–B6 don't).
+- PRD decision: no requirement; premature-optimization class — a perf mechanism with no
+  requirement anchor and no scheduled evidence.
+- Suggested edit: delete the phrase from KC 6; leave memoization to S5 implementation
+  latitude if the rewrite touches the call sites anyway. Near-zero stakes either way.
+
+## Acquittals ([keep] with requirement anchors)
+
+Gold-plating lens:
+1. **Generated platform entries in S0 + payload-parity assertion** (KC 8, S0 row) —
+   S2/S3 delete entries today's hand lists import (verified: both lists import
+   `bem:loader_type_bundle` @ build/platforms/{desktop,touch}.js:62; desktop imports
+   `bem:jquery__event_type_winresize`) — the S2/S3 dependency decides it (plan-review-1
+   C-F2). The parity assertion carries OQ-6 + keyboard Non-Goal-freeze (verified: both
+   lists import `bem:keyboard__codes`).
+2. **Two-directional ratchets + per-slice done-gate grep pins** (KC 10) — CONST-P1:
+   "shrinking it is part of each migration slice's done-criteria" + C3
+   (machine-checkable done-criteria); the reverse `comm` is not machinery.
+3. **Doc-parity fence** (KC 13, S0) — bilingual ledger is existing repo culture
+   (MIGRATION.ru.md + CHANGELOG.ru.md exist @ f2ab61e); Q7 demands bilingual migration
+   notes; C4/CONST-P4 carry per-slice migration docs. Block-doc extension correctly
+   gated behind S0 spec-craft ratification.
+4. **Capped artifacts incl. `dist/index.mjs`** (KC 10) — the barrel is a new public
+   artifact; its growth is CONST-P4-relevant; one JSON entry (payloads-only alternative
+   already requires recorded rationale). Cheap, anchored.
+5. **`ua` Proxy alias with once-per-field warns** (KC 2, D-13) — Q5 mandates a
+   one-release deprecated alias; D-13 records rejected forms (silent undefined,
+   throwing getters); Proxy + a warned-field Set is the minimal live-forwarding
+   implementation (a hand-rolled object would duplicate the removed-field list).
+6. **UA-derived getter justification + one dedicated unit per getter** (env/ua surface,
+   S1 TESTS) — G2 verbatim: "preserving the few legitimate UA-driven branches with
+   documented justification and tests".
+7. **Bench project B1–B5 + v5-base reference capture + ≤1.10× ratio thresholds**
+   (KC 11, S2 row) — Q6 verbatim role; capture is the ratio denominator (C-F9);
+   thresholds are the shared-runner noise bound (Risks row). Only B6 cut (SC-5).
+8. **S4 focus-delegation NEW tests** (S4 row, TESTS) — verified gap: zero focus/focusin
+   coverage in `i-bem-dom__events_type_dom.spec.js` (1069L); the engine's
+   focusin/focusout mapping preserves observable delegated-focus behavior — a C4 parity
+   instrument, not gold-plating.
+9. **Four named parity tests** (D-3, KC 5, S5) — Q10 names three caveats verbatim
+   (positional trigger args, `flags.fns` dedup, cross-node propagation-stop); the #1525
+   nested-same-type skip is C4 parity of existing behavior.
+10. **S3 barrel/pin switch to `bem:loader` canonical root module** (KC 7) — SQ-SF-5
+    (round 1) litigated the canonical-path decision; only the bridge is challenged
+    (SC-4).
+11. **S6 README bounded contributor section** (S6 row) — G6 "checked (lint/rule) **and
+    documented**" + US3 "docs tell me where shared behaviour goes"; restored as the US3
+    carrier by prd-align-3 US-F2; explicitly bounded (1-REQ-equivalent).
+12. **S6 docs API-accuracy pass, bounded** (S6 row, Risks) — verified ~65 `BEMDOM.*`
+    matches across `common.docs/i-bem-js/*.md` reference an API that dies at S6;
+    shipping 6.0.0 (Q9) with docs pointing at deleted APIs undermines the migration
+    story; content-redesign deferral correct.
+13. **S6 notices-intact grep** (KC 13, S6 done-gate) — CONST-P5 verbatim ("Keep
+    LICENSE.txt and file-level MPL notices intact"), C1 binding.
+
+Over-engineering lens (zero findings — all nine named machines checked):
+14. **CONST-P6 ancestor-existence check + shrinking baseline** (KC 13) — G6/US3 demand
+    a machine check wired into CI ("CI rejects"); the baseline is forced: 7 standalone
+    groups exist today (verified @ f2ab61e, prd-align-1), a bind-at-∅ check would be red
+    from S0, and a one-time early cleanup would re-do S1's ua collapse, S2's winresize
+    deletion, and S6's page-elem work ahead of their slices — anti-strangler (C2). The
+    baseline ratchet IS the migration ledger for G6.
+15. **Bundle gate: spec JSON + check script + ratchet + two-directional failure +
+    staged skip/preview** (KC 10, D-10) — it is the C3/US3 CI carrier for three
+    ratchets (bytes, CONST-P1 allowlist, CONST-P6 baseline) plus US1's artifact-level
+    jquery assertions at S6; D-10 already rejected the heavier alternative (size-limit
+    dep). Staging is forced by the amendment-at-S0 choice (a constitution clause must
+    run exit-0 from S0); an append-at-S6 script would be marginally simpler but loses
+    preview visibility + revert safety (C-F1 rationale). Not creep.
+16. **Per-slice TESTS checklist (5 items)** (Implementation Plan) — US4 verbatim
+    ("done-criteria … verify completion mechanically") + C3.
+17. **Per-slice MIGRATION ledger discipline** — G7 verbatim ("each updating
+    MIGRATION.md") + CONST-P4 ("keep updating MIGRATION.md per slice"); bilingual
+    because the ru ledgers already exist (verified).
+18. **Shim-map ratchet + per-file registration accounting** (KC 12, Data Model 6) —
+    replaces the known-defective magic floor (verified: test/browser.spec.js:35
+    `toBeGreaterThan(400)`); silent spec loss would be a C4/US5 parity hole; comparable
+    cost, better instrument.
+19. **Compile-once class-token matchers** (KC 4, D-4) — implementation latitude inside
+    the S4 engine REQ; bounded by B2. Spec-craft note: single-class BEM selectors need
+    only classList.contains-level matchers — keep the "compiled" form that simple.
+20. **WeakMap migration** (KC 6, D-5, Data Model 4) — G5 decomposition + the native
+    replacement for jquery's node cache; leak classes die by construction; cost priced
+    (risk row, B2/B4); explicit teardown correctly retained for multi-node entities.
+21. **Plugin transformer-form hard error, live S0** (KC 9) — G6 "checked (lint/rule)";
+    converts a High-risk runtime TypeError (Risks row) into a build-time error; rides
+    the existing plugin + its existing test corpus; no new tooling.
+22. **8-module i-bem-dom decomposition granularity** (KC 6) — G5 demands cohesive
+    internal modules; ~150L/module is cohesion, not machinery; invisible externally
+    (CONST-P4).
+
+Premature-optimization lens (one finding, SC-7; rest acquitted):
+23. **≤1.10× ratio thresholds** — Q6's harness role; noise-bounded (Risks); absolute
+    budgets correctly deferred (NG-F3).
+24. **One shared closest-walk per emit** (KC 5) — load-bearing for the Q10 `flags.fns`
+    per-emit dedup parity (per-emit handler collection requires the shared walk), not
+    speculative perf.
+25. **Lazy memoized env getters** (KC 1) — justified by import-order safety ("No
+    module-eval DOM reads") and emulation-parity testability (G2's tests leg), not raw
+    speed.
+26. **O(scopes×types) listener-count claim** (KC 4) — a defensive bound proving parity
+    with today's jQuery anchoring; D-4 records rejected alternatives.
+
+Defer-candidates lens:
+27. **`repository.url` fix in S0** (Exec Summary, S0 row) — Q9 verbatim ("in slice-0");
+    one line; deferring would contradict the human answer.
+28. **Exports-map narrowing at S0 (not S6)** — D-6: the narrowed map is the boundary
+    against which every slice's internal restructuring is checked; deleted-path negative
+    tests land pre-narrowed; deferring leaves `desktop.blocks/*` etc. resolvable all
+    series and pushes a public break into deletion-heavy S6.
+29. **Touch-emulated Playwright project at S1** — Q8 verbatim ("part of slice 1
+    acceptance … must not ship unverifiable"); S1 IS the touch-change slice (ua forks
+    collapse, env, orientchange transport).
+30. **Docs pass / README section / notices grep at S6** — already the latest slice in
+    the series; each carries G6/US3/CONST-P5; post-6.0.0 deferral would ship the
+    release without them.
+31. **Plan-native deferrals all verified NOT load-bearing**: inherit native-class phase
+    (Q4 freeze; spec:1813 pins behavior); absolute bench budgets (ratios shipped —
+    done-gates never read absolutes); tree-shaking (Non-Goal; US1 scoped to no-jquery;
+    plugin is the consumption story); docs content redesign (API-accuracy retained; G6
+    satisfied by the bounded README section); keyboard convoy (keyboard Non-Goal-frozen;
+    OQ-6 payload-parity assertion guards `keyboard__codes` provision at S0). None is
+    secretly required by a slice.
+
+## REQ-budget delta
+
+| Slice | Est (before) | Δ from findings | After | Notes |
+|---|---|---|---|---|
+| S0 | 11–12 (at-cap) | −1 REQ (SC-1 lint); −1 named outcome deferred (SC-2); −1 stale phrase (SC-3) | **10–11** | Cap pressure relieved; review-round-1's "generation+lint tooling split-out" contingency narrows to generation only |
+| S1 | 8–12 | 0 | 8–12 | all candidates acquitted with G2/Q5/Q8 anchors |
+| S2 | 6–8 | ~0 (SC-5 saves a scenario inside the bench REQ) | 6–8 | |
+| S3 | 4–6 | −1 (SC-4: bridge + once-warn + its dedicated test out) | **4–5** | smallest slice gains headroom |
+| S4 | 8–12 | 0 (SC-6 is a clause cut or one MIGRATION line) | 8–12 | |
+| S5 | 8–10 | 0 (SC-7 is a phrase cut) | 8–10 | |
+| S6 | 8–10 | +~0.5 ride-along (SC-2 dead-code deletion) | 8–10 | rides release prep |
+
+Series shape unchanged: 7 slices, none exceeds 12, S0 no longer at-cap.
+
+## Confidence
+
+- **High** (repo-verified or textual contradiction): SC-2 (dead code verified
+  vite-plugin-bem-levels.js:280/:669), SC-3 (contradicts applied NG-F7 + the CI-wiring
+  sentence), support facts for acquittals 1/8/17/18 (hand-list imports, focus-coverage
+  gap, ru ledgers, >400 floor — all verified @ f2ab61e). Verbatim-anchor acquittals
+  (Q5, G2, Q8, Q9, Q10, CONST-P5, G6/US3, G7, CONST-P1): high.
+- **Medium**: SC-1 (a manifest-hygiene defense exists, but D-9's doc-only stance weakens
+  it), SC-4 (bridge-vs-delete is a culture judgment; coordinator chose bridge-adjacent
+  option (a) in round 1 — counterweight documented), SC-5 (B6 overlap argument is
+  structural, not measured), SC-6 (edge-path behavior; enumerate-instead-of-cut is
+  equally valid).
+- **Low stakes by construction**: SC-7 (phrase deletion).
+- Lens coverage: gold-plating — every named candidate dispositioned; over-engineering —
+  zero findings after checking all nine named machines; premature optimization — one
+  phrase-level finding (SC-7), all other scheduled perf mechanisms carry anchors; defer
+  — all named candidates dispositioned and every plan-native deferral re-checked for
+  hidden load-bearing couplings (none found).

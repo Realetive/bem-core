@@ -1,0 +1,236 @@
+○ bc-d5y · PRD review (arch-overhaul): scope   [● P2 · OPEN]
+Owner: opencode-gc-f2fc · Assignee: bem-core/gastown.polecat · Type: task
+Created: 2026-09-17 · Updated: 2026-09-17
+
+DESCRIPTION
+
+  You are one leg of a parallel PRD review for the bem-core v5 architecture   
+  overhaul.                                                                   
+                                                                              
+  Repo root: /Users/ryganin/gc/bem-core/bem-core (branch v5, already cloned). 
+  PRD to review: /Users/ryganin/gc/bem-core/bem-core/.prd-reviews/arch-       
+  overhaul/prd-draft.md                                                       
+  Project constitution (binding constraints): /Users/ryganin/gc/bem-core/bem- 
+  core/CONSTITUTION.md                                                        
+                                                                              
+  Standard instructions:                                                      
+                                                                              
+  • Read the PRD draft file (and CONSTITUTION.md) first.                      
+  • Explore the repo as needed to ground your findings (common.blocks,        
+  desktop.blocks, touch.blocks, build/).                                      
+  • Produce your FULL report in the bead notes of this bead (gc bd update or  
+  notes as you close) using the report structure below.                       
+  • Mail the coordinator bem-core/opencode-1 when complete: gc mail send bem- 
+  core/opencode-1 -s "PRD review leg  complete" -m " closed".                 
+  • Do NOT push code, do NOT modify repo files, do NOT touch unrelated work.  
+  Review only.                                                                
+  • Be specific: cite PRD sections and repo paths. Breadth over politeness.   
+                                                                              
+  Report structure (markdown):                                                
+                                                                              
+  #                                                                           
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ## Observations                                                             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  Leg focus: scope. Challenge the MVP boundary: ~6-8 slices each <=12 REQ — is
+  that realistic for G1-G7? What should be cut, deferred, or explicitly out of
+  Non-Goals? Flag future-phase creep inside current goals (e.g. does G5       
+  decomposition exceed vision scope?).                                        
+
+
+
+NOTES
+
+  # PRD Review (arch-overhaul): Scope Leg                                     
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  Verdict: the 6–8 slice / ≤12 REQ envelope is realistic ONLY after descoping.
+  As drafted, the plan over-invests in two areas with thin repo evidence (a   
+  dedicated pointerevent slice; deep i-bem-dom decomposition) and under-scopes
+  the one area where jquery is truly load-bearing (i-bem-                     
+  dom__events_type_bem's $.event.special machinery). With the trims below, 7  
+  slices fit the envelope. The PRD's own Rough Approach invites exactly this  
+  challenge ("validate/refute this ordering") — the evidence refutes slice 4  
+  as a standalone slice.                                                      
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  1. **Slice 4 (pointerevent normalization) is phantom scope.** There is no   
+  pointerevent code in the fork: grep -rn 'pointerclick|pointer' over common. 
+  blocks/desktop.blocks/touch.blocks JS returns nothing. The only             
+  __event_type_* redefinition is desktop.                                     
+  blocks/jquery/__event/_type/jquery__event_type_winresize.js (30 lines),     
+  guarded by ua.msie && document.documentMode < 9 — dead under C5 (evergreen  
+  only). Slice 4 as described reduces to deleting one IE8 file, its import at 
+  build/platforms/desktop.js:31, and its expectation at build/plugins/vite-   
+  plugin-bem-levels.test.js:356 — a 2–3 REQ chore. Fold into Slice 2          
+  (periphery) or Slice 8 (wrapper removal). What IS real: $.event.special used
+  by common.blocks/i-bem-dom/__events/_type/i-bem-dom__events_type_bem.js:14  
+  (setup/teardown special events for BEM delegation) — but that work already  
+  belongs to Slice 5; the PRD double-counts it.                               
+  2. **Problem Statement misstates the jquery import surface.** "Production   
+  source imports it in exactly one file (the wrapper)" is true only for the   
+  npm jquery package. Ten production files import bem:jquery (idle, dom, i-   
+  bem-dom, i-bem-dom__init_auto, __events ×3, winresize, touch ua, plus the   
+  wrapper). The 9-entry CONST-P1 allowlist counts .deps.js files, not         
+  importers. Worse: the sdd-check filter (^|/)jquery/ (CONSTITUTION.md CONST- 
+  P1) makes desktop.blocks/jquery/* invisible to the ratchet — the wrapper-   
+  removal slice must cover desktop.blocks/jquery/__config and __event/_type   
+  even though the allowlist can never see them. G1's "allowlist reaches zero" 
+  is necessary but NOT sufficient for "zero internal jQuery"; final-slice     
+  done-criteria must include a repo-wide check for residual bem:jquery / from 
+  'jquery' imports.                                                           
+  3. **Slice 5 (events off jquery) is under-scoped and may need to split.** It
+  must replace: delegation via $(e.target).closest(selector) + .bem() plugin  
+  dispatch (i-bem-dom__events_type_dom.js:27–34); the special-event machinery 
+  with per-event setup/teardown (type_bem.js:14–40); $.fn.bem (i-bem-dom.     
+  js:912); jquery collection semantics relied on at i-bem-dom.js:126 ("jquery 
+  doesn't unique disconnected nodes") and :1088 (detached-DOM events); plus   
+  parity vs ~2,082 lines of specs (type_bem.spec.js 1013L, type_dom.spec.js   
+  1069L) and the synthetic-event shim ($win.trigger('orientchange', data) →   
+  native CustomEvent detail; touch.blocks/ua/ua.js:79, consumed at touch.     
+  blocks/ua/__dom/ua__dom.js:32–39). That is 10–12 coarse REQs or 16+ fine-   
+  grained ones. Recommend: allow a coarser REQ grain for this slice (spec-    
+  level, not file-level), or pre-plan 5a (native delegation engine + dom-type)
+  / 5b (bem-type special events + $.fn.bem) in the PRD rather than discovering
+  the split mid-flight.                                                       
+  4. **G4/inherit "decision executed" needs an outcome gate.** If outcome is  
+  (a) keep-as-internal (inherit.vanilla.js is 121 lines with spec), the slice 
+  is trivial: freeze + docs. If (b) reimplement on native classes preserving  
+  decl/declMod/onSetMods, it is a rewrite of the substrate of i-bem.vanilla.js
+  (637L), i-bem-dom (1220L), _*events_**type**, __collection — a whole program,
+  not a slice. If (c) expose native-class authoring alongside, it contradicts 
+  the PRD's own Non-Goals ("No new features… public API additions"; "No       
+  TypeScript rewrite… later convoy"). MVP scope: decision documented with     
+  rationale; execution in-scope ONLY if the decision is (a); (b)/(c) become a 
+  named future phase. As written, slice 6 is an unbounded option hidden inside
+  a bounded plan.                                                             
+  5. **G5 (i-bem-dom decomposition) is half done; the rest is future-phase    
+  creep inside current goals.** __collection (160L + spec), __events (330L),  
+  _*events_**type**, __init (+build-time barrel) are already separate modules 
+  with specs. The 1220-line i-bem-dom.js remainder is init orchestration +    
+  DomEntity API + live-instance management. Further decomposition beyond what 
+  the events/jquery slices force is internal-only refactoring with zero       
+  consumer-visible value (CONST-P4: public surface unchanged) and real parity 
+  risk vs v5-base. Recommend restating G5 as "finish the seams S5 opens       
+  (delegation, special events) and pin the public surface with API tests".    
+  Full four-way decomposition (live collection/ranges, delegation,            
+  pointerevent norm [n/a — no pointer code exists], init lifecycle [already   
+  extracted]) is post-MVP.                                                    
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  6. **The **env** wishlist exceeds demonstrated consumer demand.** G2 lists  
+  "input modality, pointer events, passive listeners, RTL…" — the repo has    
+  zero pointer-event consumers and zero RTL consumers. Actually-read ua fields
+  (grep): match, ios, android, landscape, width/height, svg, screenSize, msie,
+  chrome, opera, bada, wp — used by ua__dom (mod-setting), winresize (ua.msie;
+  being deleted), and ua.js itself. Under C4 and the "no new public API       
+  additions" Non-Goal, env MVP should be scoped strictly by the OQ2 consumer  
+  inventory; RTL/passive-listeners/input-modality → Non-Goals ("capability    
+  checks added when a consumer needs them"). Also note the tension: a new     
+  public env module IS a public API addition — carve it out of that Non-Goal  
+  explicitly, as the loader rework implicitly is.                             
+  7. **Dead-platform branches shrink Slice 1 — with a parity trap.** touch.   
+  blocks/ua/ua.js (204L) detects Android/iOS/Bada/WP/Opera; bada, wp, msie,   
+  opera-version are dead under C5, so most detection collapses. Trap: ua__dom 
+  turns these fields into observable block mods (platform=, ios-subversion,   
+  screen-size, orient…) and mutates ua.width/height/landscape on orientchange.
+  Deleting dead fields changes rendered mod values — C4 requires each delta to
+  be a documented migration in the slice spec, not silent cleanup. Budget 2–3 
+  REQs of Slice 1 for that documentation + spec updates.                      
+  8. **Loader slice is small.** loader_type_js.js is 62 lines (+spec);        
+  loader_type_bundle.js 106L; only importers are build/platforms/{desktop,    
+  touch}.js:62 and test/browser/entry.js. i18n does not import loader         
+  (verified) so the i18n Non-Goal holds. 4–6 REQs. OQ6 should be answered in  
+  the PRD: with ym gone and no consumers beyond build entries, deletion is the
+  MVP-consistent answer.                                                      
+  9. **Benchmarks decision (OQ9) belongs in the PRD, not a slice.** i-bem-dom.
+  tests/benchmarks.blocks is 6 files / 1 bemjson; the allowlist entry exists  
+  only via page.deps.js → jquery. Either answer deletes the entry; slice 2's  
+  REQs differ by the answer, so leaving it open makes the spec unresolvable.  
+  Recommend: delete as pre-Vite relic and note the loss of the perf arm in US5
+  verification (or keep one Playwright smoke benchmark).                      
+  10. **Public-surface inventory (OQ8) is a prerequisite deliverable, not an  
+  open question.** CONST-P4/C4 done-criteria are unauditable without a v5-base
+  export manifest + API-pinning test. Make it design-doc/slice-0 output (spec-
+  only work). Also: CONST-P4 enumerates only i-bem, i-bem-dom, events — ua    
+  exports are publicly consumed (ua__dom) and must be covered by CONST-P4 or  
+  explicitly exempted in the ua slice.                                        
+  11. **jQuery compat shim (OQ1) is speculative scope under CONST-P5.** Hard  
+  fork, no known external consumers; shipping bem-core/compat-jquery + peer-  
+  dep + EOL policy is distribution work for an audience that may not exist.   
+  MVP: delete the wrapper outright; revisit if a consumer materializes. Drop  
+  the "escape hatch" branch of G1 or move it to Non-Goals.                    
+  12. **Per-slice doc updates are unbudgeted REQ inflation.** MIGRATION.md per
+  slice is one REQ, but jquery/ua/loader/dom blocks carry ru/en md docs (e.g. 
+  common.blocks/jquery/jquery.{en,ru}.md, desktop.blocks/ua/ua.ru.md) +       
+  CHANGELOG. Either +1 REQ per slice or Non-Goal it ("block docs updated in a 
+  final docs slice") — otherwise the ≤12 budget silently erodes.              
+  13. **Slice arithmetic after trims (all ≤12):** S1 env/ua (8–12, incl.      
+  parity docs) · S2 periphery: dom+idle+winresize+benchmarks (6–8) · S3 loader
+  (4–6) · S4 events core: native delegation + dom-type (8–12) · S5 bem-type   
+  events + $.fn.bem, split of S4 (6–10) · S6 inherit decision, (a)-only       
+  execution gate (2–4) · S7 platform override-only check + wrapper removal +  
+  allowlist=∅ + MIGRATION final (8–10). Seven slices; the envelope holds — but
+  only because the standalone pointerevent slice was folded, inherit was gated,
+  and G5 was descoped. As literally drafted (8 slices incl. standalone        
+  pointerevents + unbounded inherit + full G5 decomposition), 6–8×≤12 is NOT  
+  realistic.                                                                  
+                                                                              
+  ## Observations                                                             
+                                                                              
+  14. specs/ exists at repo root but is empty (commit f2ab61e). The PRD never 
+  says where slice specs live; the design doc should fix location + template  
+  (specs/.md with sdd-check blocks) so C3 is mechanical.                      
+  15. G6's "checked (lint/rule)": a custom ESLint rule validating platform-   
+  file ↔ common-ancestor correspondence is a mini-project; a constitution sdd-
+  check (bash existence/ancestor check) achieves C3 compliance far cheaper.   
+  Recommend sdd-check for MVP.                                                
+  16. Non-Goal nit: "beyond what the loader/ESM work forces" should read      
+  "beyond what the loader and env/ua work force" — ua templates (ua.bemhtml/bh
+  in both desktop and touch levels; verified they only flip ua_js classes) get
+  folded into common by S1.                                                   
+  17. US4's "verify completion mechanically" pairs naturally with gap #2:     
+  final-slice done-criteria should include "repo-wide grep for bem:jquery /   
+  from 'jquery' → empty", not just allowlist=∅.                               
+  18. Rough Approach's own ordering question ("must events extraction precede 
+  pointerevents?") is moot per #1 — no pointerevents exist. The real ordering 
+  edge is S4/S5 before S7 (wrapper removal needs all importers gone), which   
+  the draft already respects.                                                 
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  High confidence on file-level facts (all cited paths/line counts verified   
+  in-repo at HEAD f2ab61e): jquery import surface, absence of pointerevent    
+  code, winresize IE8 guard, loader sizes, ua consumer inventory, partial i-  
+  bem-dom decomposition. Medium-high on slice sizing (REQ counts are estimates
+  from code+spec volume; the unknown is hidden jquery semantics in events     
+  parity — special-event bindType/trigger data-shim corner cases — which could
+  inflate S4/S5 by a few REQs). Medium on the inherit recommendation (no      
+  external-consumer data; if the fork owner wants native-class authoring for  
+  ergonomics, G4-(c) is a product choice — but it still should not ride inside
+  this convoy). The 7-slice arithmetic assumes benchmarks deletion and compat-
+  shim removal; if both stay open, add ~1 slice and ~4 REQs.                  
+
+
+
+METADATA
+  coordinator: bem-core/opencode-1
+  gc.work_outcome: shipped
+  review_id: arch-overhaul
+  review_leg: scope
+  review_phase: prd
+
+BLOCKS
+  ← ○ bc-rnk: input convoy for bc-d5y ● P2
+

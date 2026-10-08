@@ -1,0 +1,334 @@
+✓ bc-ic7 · PRD review (arch-overhaul): gaps   [● P2 · CLOSED]
+Owner: opencode-gc-f2fc · Assignee: bem-core/gastown.polecat · Type: task
+Created: 2026-09-17 · Updated: 2026-09-17
+Close reason: Closed
+
+DESCRIPTION
+
+  You are one leg of a parallel PRD review for the bem-core v5 architecture   
+  overhaul.                                                                   
+                                                                              
+  Repo root: /Users/ryganin/gc/bem-core/bem-core (branch v5, already cloned). 
+  PRD to review: /Users/ryganin/gc/bem-core/bem-core/.prd-reviews/arch-       
+  overhaul/prd-draft.md                                                       
+  Project constitution (binding constraints): /Users/ryganin/gc/bem-core/bem- 
+  core/CONSTITUTION.md                                                        
+                                                                              
+  Standard instructions:                                                      
+                                                                              
+  • Read the PRD draft file (and CONSTITUTION.md) first.                      
+  • Explore the repo as needed to ground your findings (common.blocks,        
+  desktop.blocks, touch.blocks, build/).                                      
+  • Produce your FULL report in the bead notes of this bead (gc bd update or  
+  notes as you close) using the report structure below.                       
+  • Mail the coordinator bem-core/opencode-1 when complete: gc mail send bem- 
+  core/opencode-1 -s "PRD review leg  complete" -m " closed".                 
+  • Do NOT push code, do NOT modify repo files, do NOT touch unrelated work.  
+  Review only.                                                                
+  • Be specific: cite PRD sections and repo paths. Breadth over politeness.   
+                                                                              
+  Report structure (markdown):                                                
+                                                                              
+  #                                                                           
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  ## Observations                                                             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  Leg focus: gaps. Hunt missing requirements: edge cases, browser/env         
+  matrices, migration and compatibility hazards (9 frozen jquery consumers,   
+  loader users, inherit users), ops/build gaps (Playwright specs still using  
+  modules.define per repo scan), documentation, and anything the PRD ignores  
+  but the repo state forces (see common.blocks/*, specs/).                    
+
+
+
+NOTES
+
+  # PRD Review (arch-overhaul): Gaps — Missing Requirements & Repo-Forced     
+  Considerations                                                              
+                                                                              
+  Reviewed: prd-draft.md vs repo @ f2ab61e (branch v5), CONSTITUTION.md,      
+  build/, test/, specs state.                                                 
+  Leg: gaps. Breadth-first; every claim cites repo path.                      
+                                                                              
+  ## Summary                                                                  
+                                                                              
+  The PRD is strong on jquery/ua/loader/inherit strategy and strangler        
+  discipline, but it has                                                      
+  material gaps in five areas the repo state forces: (1) the **public API is  
+  jQuery-typed**, so                                                          
+  G1 collides head-on with CONST-P4 and the PRD never says what replaces      
+  jQuery types in                                                             
+  signatures; (2) the **verification anchor is missing** — tag v5-base does   
+  not exist in this                                                           
+  clone or on origin, and the touch platform is never tested; (3) **one slice 
+  premise is stale** —                                                        
+  pointerevent normalization doesn't exist anywhere in the repo; (4) the      
+  **test harness itself**** is                                                
+  ****a migration surface** (ym-authored specs, hand-maintained shim registry,
+  hard-coded >400 gate)                                                       
+  that no requirement covers; (5) **packaging/relic cleanup** (UMD dist,      
+  exports map without                                                         
+  touch entry, ENB-era test/dist + common.bundles, dead IE code in platform   
+  levels) is                                                                  
+  uninventoried beyond the benchmarks page.                                   
+                                                                              
+  ## Critical Gaps / Questions                                                
+                                                                              
+  1. **Public API is jQuery-typed — G1 as written is unimplementable without  
+  an**** API-type                                                             
+  ****strategy (CONST-P4 collision).** The PRD frames jquery as internal      
+  substrate, but jQuery                                                       
+  types leak across the public surface:                                       
+      • common.blocks/i-bem-dom/i-bem-dom.js:342 — this.domElem = domElem;    
+      every entity's                                                          
+      domElem is a jQuery collection (.add() at :114, .not() at :227, jQuery  
+      selector call                                                           
+      this.domElem[select](selector) at :621).                                
+      • bemDom.scope = $('body'), bemDom.doc, bemDom.win — public properties  
+      holding                                                                 
+      jQuery collections (i-bem-dom.js tail, set on jQuery DOM-ready).        
+      • initOnDom / getFromDom accept HTMLElement|jQuery (i-bem-dom.js:1198-  
+      1207);                                                                  
+      updateTree/replace/append/prepend/insertBefore/insertAfter              
+      consume/return jQuery                                                   
+      collections (:1125-1185).                                               
+      • The .bem() **jQuery plugin** is load-bearing in delegation:           
+      common.blocks/i-bem-dom/__events/_type/i-bem-dom__events_type_dom.js    
+      wrapperFn calls                                                         
+      $(e.target).closest(...) and entityDomNode.bem(ctx) — $('.x').          
+      bem('block') is a                                                       
+      consumer-facing idiom.                                                  
+      • common.blocks/dom/dom.js — contains(ctx, domElem) takes jQuery        
+      collections;                                                            
+      getFocused() returns $(document.activeElement).                         
+      **Needed requirement:** an explicit public-surface type contract (accept
+      Element|NodeList|Array|Document|Window? what type is domElem?           
+      replacement for .bem()?)                                                
+      with a CONST-P4 migration doc. OQ8 (export inventory) is related but    
+      strictly smaller than                                                   
+      this — it's the shape of every signature, not just the barrel.          
+  2. **Tag **v5-base** does not exist.** git ls-remote origin (Realetive/bem- 
+  core) shows only                                                            
+  refs/heads/v5 @ f2ab61e; local git tag -l is empty. CONST-P5 and US5 ("diff 
+  behavior                                                                    
+  before/after against tag v5-base") are unverifiable as written. **Needed:** 
+  a slice-0 ops                                                               
+  requirement to create/push the tag (or pin the SHA) *before* the first      
+  architecture slice,                                                         
+  plus a documented per-slice before/after diff procedure (which tests, which 
+  fixtures).                                                                  
+  3. **Pointerevent normalization premise is stale — slice 4 has no repo      
+  referent.**                                                                 
+  find -name '*pointer*' → nothing. No jquery__event_type_pointerclick files  
+  exist                                                                       
+  (MIGRATION.md even cites that path as an example — it's gone). The only     
+  surviving                                                                   
+  __event_type_* is desktop.                                                  
+  blocks/jquery/__event/_type/jquery__event_type_winresize.js,                
+  IE8-only code (ua.msie && document.documentMode < 9) that is dead under C5. 
+  The real                                                                    
+  hidden dependency of __events_type_dom is **jQuery event normalization**    
+  (event objects,                                                             
+  .closest() traversal, .bem() lookup, delegation semantics), which the PRD   
+  never names.                                                                
+  **Needed:** re-anchor slice 4 (delete it as a pointerevent slice; fold in   
+  "jQuery event                                                               
+  normalization semantics parity" as an explicit deliverable of slice 5) and  
+  correct the                                                                 
+  Problem Statement / OQ3 accordingly.                                        
+  4. **No browser matrix requirement; touch platform is never tested.**       
+      • playwright.config.js — chromium only; CI (ci.yml) installs only       
+      chromium. C5 says                                                       
+      "modern evergreen browsers" but the PRD sets no matrix requirement      
+      (webkit/firefox), no                                                    
+      RTL/reduced-motion test story despite G2 mentioning RTL and input       
+      modality.                                                               
+      • build/vite.test.config.js pins platform: 'desktop' — the **touch build
+      is**** never                                                            
+      ****loaded by any test**. Touch-only modules (touch ua incl.            
+      orientchange custom event,                                              
+      touch.blocks/ua/__dom/ua__dom.js reading ~15 ua fields incl. screenSize,
+      ios-subversion) have zero coverage. G2/G6 touch slices have no          
+      verification harness.                                                   
+      **Needed:** a verification-matrix requirement per slice (browsers ×     
+      platforms), and a                                                       
+      touch-platform harness decision (Playwright projects? separate vite test
+      config?).                                                               
+  5. **Spec corpus and harness are themselves a migration surface — no        
+  requirement covers them.**                                                  
+      • All 25 *.spec.js (common.blocks only) are authored in ym style        
+      (modules.define('spec', [...])) and run through test/browser/modules-   
+      shim.js;                                                                
+      test/browser/entry.js **hand-maintains** the pre-registered module map. 
+      ua, idle,                                                               
+      loader_type_bundle, keyboard__codes are absent from the map → **no specs
+      can**** exist                                                           
+      ****for them today**. US2's "tests (Playwright) stay green" is vacuous  
+      for the env/ua slice —                                                  
+      G2 must *create* tests (also for loader_type_bundle).                   
+      • test/browser.spec.js hard-codes expect(total).toBeGreaterThan(400) —  
+      every slice that                                                        
+      adds/removes specs trips this gate; needs a policy (drop the floor, or  
+      make it dynamic).                                                       
+      • i-bem-dom.spec.js:1813 ("modules.define patching") tests dynamic      
+      redefinition —                                                          
+      G4/G5 refactors must keep or consciously migrate this spec pattern.     
+      • Spec files resolve dependencies **by module-name strings** via the    
+      shim — refactors that                                                   
+      rename/merge internal modules (G5 decomposition) break specs silently   
+      unless the shim map                                                     
+      is updated in lockstep.                                                 
+      **Needed:** a harness-evolution requirement attached to slices 1, 5, 7. 
+                                                                              
+                                                                              
+  ## Important Considerations                                                 
+                                                                              
+  6. **CONST-P3 enforcement mechanics are undefined against current tooling.**
+  eslint.config.js                                                            
+  ignores large swaths (common.blocks/inherit/ frozen entirely, specs,        
+  bemhtml/bh, tests                                                           
+  dirs). G6's "checked (lint/rule)" needs a decision: eslint rule, sdd-check  
+  grep, or a                                                                  
+  vite-plugin-bem-levels scan. Also define "override" under the barrel        
+  semantics: the plugin                                                       
+  composes cross-level same-name modules as transformer chains                
+  (export default function(base){...}, build/plugins/vite-plugin-bem-levels.  
+  js:503-526);                                                                
+  desktop.blocks/jquery/__config is the only compliant example today (and it's
+  a no-op                                                                     
+  return base). Platform files should be mandated transformer-form or side-   
+  effect redefs.                                                              
+  7. **ua replacement ripples into the templating layer** — ua.bemhtml.js/ua. 
+  bh.js,                                                                      
+  ua/__svg/ua__svg.bh.js (common), and page templates at all three levels     
+  consume ua-driven                                                           
+  behavior (ua_js_yes class toggle, ua_svg). The Non-Goals exclude template   
+  redesign "beyond                                                            
+  what the loader/ESM work forces" — the env/ua work forces it too. Slice 1   
+  must include a                                                              
+  template impact assessment or scope-creep will surface mid-slice.           
+  8. **Loader G3 misstates current semantics.** loader_type_js.js has **no    
+  timeout** (only                                                             
+  loader_type_bundle has LOADING_TIMEOUT=30000). PRD G3 lists "timeout" among 
+  existing                                                                    
+  loader_type_js semantics to preserve — either a spec must be added or the   
+  requirement                                                                 
+  dropped. Also loader_type_bundle consumes the ym bundle format (window.     
+  _ycssjs,                                                                    
+  bundle.js.call(globalThis) — loader_type_bundle.js) which the new toolchain 
+  cannot                                                                      
+  produce; "reimplement on dynamic import" (G3) is questionable for a format  
+  nothing emits                                                               
+  anymore — deletion + migration doc is the likely outcome; make the bundle-  
+  format inventory                                                            
+  an explicit decision input for OQ6 rather than an afterthought.             
+  9. **ua has no common ancestor.** common.blocks/ua/ contains only           
+  templates/docs — the JS                                                     
+  exists only as fully independent forks (desktop.blocks/ua/ua.js = jQuery.   
+  browser-style                                                               
+  chrome/webkit/msie sniffing; touch.blocks/ua/ua.js =                        
+  platform/device/support/orientchange,                                       
+  a jquery consumer). "Collapse into common + deltas" is greenfield JS work,  
+  not a refactor —                                                            
+  size slice 1 accordingly. Consumers to audit for the ua API inventory (OQ2):
+  touch                                                                       
+  ua__dom (ios/android major version mods, opera, screenSize, svg,            
+  orientchange updates of                                                     
+  ua.width/height/landscape — note touch ua is *mutable state*, not just      
+  detection), desktop                                                         
+  winresize (ua.msie), templates.                                             
+  10. **Packaging gaps at the endgame slice.** package.json exports only . →  
+  dist/desktop/bem-core.mjs; the touch build is unreachable via the export map.
+  build/vite.config.js still emits **UMD** (formats: ['es','umd'], jquery     
+  external with                                                               
+  globals) — CONST-P2 bans new UMD but the PRD never decides the existing     
+  artifact's fate.                                                            
+  Removing peerDependencies.jquery in the final slice implies a semver/release
+  story                                                                       
+  (currently 5.0.0) and consumer install instructions — no requirement covers 
+  versioning or                                                               
+  the release sequence across slices.                                         
+  11. **Relic inventory is incomplete beyond OQ9 (benchmarks page).** Also    
+  present and                                                                 
+  unaddressed: test/dist/* (ENB-era: borschik, bem-walk, libs/bem-pr, CJS —   
+  wired to                                                                    
+  no npm script), common.bundles/ (ym square example using modules.define),   
+  common.blocks/i18n/i18n.tests/blocks/logo/logo.js (references dead i-       
+  bem__dom name),                                                             
+  desktop page page.examples/40-es5-shims + conditional-comment tmpl-specs    
+  (IE-era),                                                                   
+  IE8/IE9 code in winresize and dom.js. Several of these are dead weight that 
+  inflates the                                                                
+  jquery/legacy surface slice 8 must clear; others (es5-shims, conditional    
+  comments)                                                                   
+  directly contradict C5 and should get an explicit fate in the slice plan.   
+                                                                              
+  ## Observations                                                             
+                                                                              
+  • The 9-file CONST-P1 allowlist is verified current: repo grep matches the  
+  list exactly (plus                                                          
+  desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.deps.js,   
+  self-referential                                                            
+  inside jquery/, correctly excluded by the check's (^|/)jquery/ filter).     
+  • Production sources are already ESM (bem: virtual imports resolved by      
+  vite-plugin-bem-levels); redefinitions compose via generated transformer    
+  barrels. Empirically                                                        
+  checked with the plugin's own API: desktop has exactly one multi-level      
+  module                                                                      
+  (jquery__config), touch has none.                                           
+  • Cheap wins for slice 2 sizing: i-bem-dom__init_auto is 8 lines ($(ready) +
+  nextTick);                                                                  
+  idle.js uses jquery only for $(document).on('mousemove keydown click').     
+  • MIGRATION.md already carries a 5.0.0 section (ym→ESM, jQuery 3→4,         
+  vow→Promise, ENB→Vite)                                                      
+  — per-slice updates fit the existing culture (CONST-P4).                    
+  • eslint freezes common.blocks/inherit/ — a native-class rewrite (G4b)      
+  reopens lint exposure;                                                      
+  inherit.spec.js exists as the parity baseline.                              
+  • Node-side npm test covers only the vite plugin and i18n; all behavior     
+  parity lives in the                                                         
+  browser suite (>400 mocha tests, 0 failures allowed, desktop/chromium only).
+  • CI (ci.yml) triggers on push to master/v* and PRs to master|v5; the fork  
+  integrates on v5.                                                           
+  C2/G7 say "leaves main buildable" — the slice specs should name v5 as the   
+  integration                                                                 
+  branch explicitly to avoid ambiguity for slice engineers (US4).             
+                                                                              
+  ## Confidence Assessment                                                    
+                                                                              
+  • **High** on file-level citations — all read directly @ f2ab61e; allowlist 
+  verified by grep;                                                           
+  barrel semantics verified by executing the plugin's exported                
+  buildRegistry/generateBarrel                                                
+  read-only.                                                                  
+  • **Medium** on behavioral claims about the jQuery normalization surface    
+  (inferred from                                                              
+  delegation/wrapper code, not exhaustively traced into jquery internals).    
+  • The v5-base absence is verified against this clone and ls-remote origin;  
+  if the tag lives                                                            
+  on another remote, finding #2 downgrades to "not present in this            
+  clone/origin" but still                                                     
+  blocks US5 as written.                                                      
+  • Review-only constraint honored: no builds/tests executed, no repo files   
+  modified, no state                                                          
+  mutated beyond this bead's notes.                                           
+
+
+
+METADATA
+  coordinator: bem-core/opencode-1
+  review_id: arch-overhaul
+  review_leg: gaps
+  review_phase: prd
+
+BLOCKS
+  ← ✓ bc-vj2: input convoy for bc-ic7 ● P2
+

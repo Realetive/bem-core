@@ -1,0 +1,277 @@
+# Plan-review-1 · sequencing
+
+Review of `.designs/arch-overhaul/design-doc.md` @ prd-align-3 state (the PLAN's slice
+DAG S0→{S1,S2,S3}; S2→S4→S5→S6; {S1,S3}→S6). All repo facts verified read-only @
+f2ab61e (branch v5, worktree `/Users/ryganin/gc/bem-core/bem-core`). No plan steps
+executed; no repo files edited.
+
+## Summary
+
+The DAG's topology is sound: every stated edge is real (some only via S6's
+release-prep role), every correctly-omitted edge was checked and is genuinely
+unneeded (S1↛S4, S3↛S4/S5, S1↛S3, S2↛S3), the allowlist arithmetic (9→∅) matches
+the CONSTITUTION.md CONST-P1 allowlist 1:1, and the CONST-P6 −3 riding S1 is
+achievable inside S1 as scoped. Two must-fix defects sit at the DAG's seams:
+
+1. **The staged final gates auto-activate one slice too early.** The skip-guard is
+   "allowlist ≠ ∅", but the allowlist hits ∅ *after S5* while the gates' own
+   predicates (no-jquery-in-artifact; "wrapper dirs gone, package.json clean") only
+   become true at S6 — and jquery legitimately remains in the payload at S5 (the
+   platform entries import `bem:jquery` directly; verified). Auto-activation keyed
+   on allowlist-∅ makes S5's merge commit CI-red, re-breaking the exact
+   per-slice-green invariant (C2/G7) that prd-align-1 GA-F2 fixed.
+2. **Parallel-slice entry-list handling is unscheduled.** The hand-maintained
+   platform entries (`build/platforms/{desktop,touch}.js`) import
+   `jquery__event_type_winresize` (desktop, deleted S2) and `loader_type_bundle`
+   (both, deleted S3) — verified. Generation that would obsolete the lists is
+   scheduled only as the ambiguous "S0–S1 tooling", so S2/S3 can land while the
+   lists are live → unresolvable `bem:` import → build breaks; and parallel
+   hand-edits to the same two files race each other and OQ6's payload-parity
+   baseline.
+
+Six should-fix items cover the spurious/omitted "S1 soft" edge, the "(S0/S6)"
+plugin-validation ambiguity, three verifier-churn gaps (S1 pin-test update, S6
+final budget caps, S3 loader canonical path), and the one-directional ratchet
+that lets forgotten allowlist shrinks pass silently until S6.
+
+## Edge-by-edge verdict table (pair → edge stated? → needed? → verdict)
+
+| Pair | Stated? | Needed? | Verdict |
+|---|---|---|---|
+| S0→S1 | yes (S1 deps "S0") | yes — S1 consumes S0's pin test, payload-parity baseline (today's hand lists), specs convention, bundle gate | keep |
+| S0→S2 | yes | yes — S2's rewrites/deletions/bench ride the S0 fence; bench is S4/S5 done-gate (KC11) | keep |
+| S0→S3 | yes | yes — S0 fence; entry-list/generation prerequisite (see MF-2) | keep |
+| S1→S2 | "S1 soft" in slice table; **absent from the DAG-shape line** | **no** — no S2 outcome reads env/ua (see SF-1 evidence) | drop or promote+justify (SF-1) |
+| S1→S3 | no | no | correct omission |
+| S2→S3 | no | no | correct omission |
+| S1→S4 | no | no — engine sources contain zero ua/env reads (`__events*.js`, `__init_auto.js` verified); focus tests run on chromium | correct omission |
+| S2→S4 | yes | yes — bench done-gate (KC11) + S5 consumes facade ("i-bem-dom → S2 facade + S4 engine", S5 row) | keep |
+| S3→S4 | no | no — the interim trio has zero loader references (verified) | correct omission |
+| S3→S5 | no | no — same | correct omission |
+| S4→S5 | yes | yes — registry composes with the Option-B engine (D-3); S5 −3 disposition names S4 engine | keep |
+| S1→S6 | yes | yes — release-prep/docs need S1 landed; S6 deletes `desktop.blocks/jquery/*` wholesale while S1 guarantees the ua family is already common-based | keep |
+| S2→S6 | transitive via S4→S5 | yes | keep (transitive) |
+| S3→S6 | yes | yes, role-based only — loader never touches jquery (verified; only doc-example mentions), so the edge is justified by S6's release-prep role (MIGRATION consolidation, classic-script semantic-shift docs), not wrapper deletion | keep (minimal: no tighter fan-in possible without dropping the release-prep scope) |
+| S4→S6 | transitive | yes | keep (transitive) |
+| S5→S6 | yes | yes — allowlist ∅ is S6's precondition ("∅ after S5, making S6 purely deletion") | keep |
+
+Allowlist arithmetic cross-check: CONSTITUTION.md CONST-P1 allowlist = 9 files;
+S1 −1 (`touch.blocks/ua/ua.deps.js`) + S2 −3 (`dom`, `idle`, benchmarks `page`) +
+S4 −2 (`__events`, `__events_type_dom`) + S5 −3 (`i-bem-dom`, `__events_type_bem`,
+`__init_auto`) = ∅ after S5. Matches Exec Summary. ✓
+
+## Findings
+
+### MUST-FIX
+
+**MF-1. Final-gate auto-activation binds at S5, not S6 — re-breaks C2/G7 (GA-F2 regression).**
+Sections: Executive Summary staged-gate bullet ("…**activate at S6**, when the
+CONST-P1 allowlist reaches ∅"); Key Components 10 ("**activate at S6** (or
+auto-activate once the allowlist reaches ∅)"); Key Components 13 ("until the
+allowlist reaches ∅ and is conclusive (binding) at S6").
+Slices/edges: S5→S6 boundary; S5's own done-gate.
+Why it breaks: Exec Summary states "∅ after S5" — so on S5's merge commit the
+guard "short-circuit while the allowlist ≠ ∅" flips off and the final assertions
+bind one slice before their own preconditions exist:
+- no-jquery-in-artifact: the payload entries import jquery *directly by module*,
+  not via deps — `build/platforms/desktop.js:30` `import 'bem:jquery'` (plus
+  `:29` `bem:jquery__config`), `touch.js:29–30` (verified @ f2ab61e). Deleting the
+  wrapper, `desktop.blocks/jquery/*`, and the peer/dev deps is S6 work; at S5 the
+  artifact legitimately contains jquery, so the binding assertion fails.
+- CONST-P1 final predicate: conjunctive over S6-only facts ("wrapper dirs gone,
+  package.json clean" — package.json still carries `peerDependencies.jquery` +
+  `devDependencies.jquery` `^4.0.0`, verified). Cannot pass at S5.
+Net: S5 CI red → violates "Every slice leaves `v5` buildable and tests green"
+(Design position 6 / C2 / G7) — the exact failure mode prd-align-1 GA-F2 corrected
+for S1–S5, reintroduced for the S5→S6 window.
+Suggested fix (three cells): guard on the conjunction, not the allowlist alone —
+"short-circuit to preview + exit 0 while (allowlist ≠ ∅) **OR** the wrapper block
+still exists / package.json still lists jquery; binding otherwise (first possible
+binding commit = S6)". Concretely: Exec Summary bullet, KC10 staging paragraph,
+KC13 CONST-P1 sentence — replace "auto-activate once the allowlist reaches ∅" with
+"auto-activate once the allowlist is ∅ **and** the wrapper block is deleted (no
+earlier than S6)". Alternative shape: key the auto-activation on the CONST-P1
+final predicate's own remaining-conditions count, so binding and pass-ability
+flip on the same commit.
+
+**MF-2. S2/S3 deletions hit the platform entry lists; neither the entry edit nor the generation switchover is scheduled in any slice.**
+Sections: Key Components 8 ("Init registry (S0–S1 tooling) — platform entry
+modules **generated** from the plugin's scan registry (replacing hand-maintained
+ordered import lists)"); Open Question 6 ("the S0/S1 generation REQ"); Slice
+series rows S2 ("winresize deleted") and S3 ("`loader_type_bundle` deleted").
+Slices/edges: S0→{S1,S2,S3} fan-out; S1∥S2∥S3 parallelism.
+Why it breaks (repo-verified): the hand lists reference exactly the entries S2/S3
+delete — `build/platforms/desktop.js:31` `import 'bem:jquery__event_type_winresize'`;
+`desktop.js:62` and `touch.js:62` `import 'bem:loader_type_bundle'`. If a deletion
+slice merges while hand lists are live, Vite cannot resolve the `bem:` specifier →
+build fails → the slice cannot go green without entry-list work that appears in
+no slice row, no TESTS item, and no Harness Δ. Generation is pinned only to the
+two-slice window "S0–S1", so:
+- if generation lands S0: no problem (deletions flow through the scan) — but the
+  doc doesn't say S0;
+- if generation lands S1: S2 and S3 run **in parallel with** the switchover —
+  whichever merges first must hand-edit both lists (three-way textual race on the
+  same two files), and OQ6's payload-parity assertion "against today's hand
+  lists" loses its baseline the moment any parallel slice edits them.
+Suggested fix: pin the switchover to S0 — S0's KC8 line becomes "Init registry
+(S0): platform entry modules generated from the scan registry; hand-maintained
+lists deleted in S0 (payload-parity assertion vs the pre-S0 lists runs in S0)".
+Then S2/S3 rows need no entry work (deletions auto-flow through regeneration),
+and OQ6's baseline is a fixed, pre-parallel state. If S1 must own generation
+instead, then S2 and S3 rows + TESTS must each gain an explicit "entry-list edit
+(hand or regenerated) + local payload-parity re-baseline" item and the DAG note
+should warn about the shared-file race.
+
+### SHOULD-FIX
+
+**SF-1. S2's "S1 soft" dep is unsupported by evidence, and the DAG-shape line omits it anyway.**
+Sections: Slice series table S2 row ("Deps: S0; S1 soft"); "DAG shape: `S0 → {S1,
+S2, S3}`; …" (same section, closing line).
+Evidence @ f2ab61e: no S2 outcome needs S1 — `dom.js`/`idle.js` import jquery
+(plus events/inherit) and nothing else; winresize *reads* `ua.msie` but S2 deletes
+it rather than rewriting it; bench blocks `b1/b2` are pure i-bem-dom event blocks
+(page.deps.js = i-bem-dom init + jquery only); scenarios B1–B6 (init, delegated
+dispatch, BEM emit, live-collection, destruct, startup) read no env/ua field.
+Meanwhile the canonical DAG-shape line create-beads reads has no S1→S2 edge at
+all — table and DAG line disagree.
+Suggested fix: delete "; S1 soft" from the S2 row (leaving S0), or — if the soft
+edge exists to keep the bench baseline stable across S1's ua rework — say so in
+one clause and add the soft edge to the DAG-shape line. One merge-order note
+worth a parenthetical in the S2 row: if S1 lands first, `ua.msie` → undefined via
+the alias, silently no-oping winresize's IE8 guard until S2 deletes it — verified
+harmless (zero in-repo consumers of the winresize event), but the plan should
+state the tolerance.
+
+**SF-2. Plugin transformer-form validation "(S0/S6)" — the High-risk mitigation has no named landing slice.**
+Sections: Key Components 9 ("vite-plugin-bem-levels validation (S0/S6) — …
+hard-error when a chain entry at index ≥1 is not transformer-form"); Risks row
+"Override-barrel runtime TypeErrors … Mitigation: Plugin transformer-form hard
+error (S0/S6)".
+Why ambiguous-wasteful: one mechanism, two slices, no sentence saying which slice
+introduces the hard error. If it lands S6, then S1's ua `__dom` override delta and
+S4/S5's transformer barrels ship unvalidated — the cited mitigation for a *High*
+risk is absent during exactly the window the risk is live. If it lands S0, the
+"/S6" needs a stated remainder (none is given).
+Suggested fix: land the hard error in S0 (pure addition; the plugin + its test
+corpus already exist — `build/plugins/vite-plugin-bem-levels.test.js` already
+asserts winresize's ESM form, verified). Reword KC9 to "(S0)" and drop "/S6" from
+the Risks row, or specify what S6 adds (e.g., nothing).
+
+**SF-3. S1 mutates the S0 api-pin contract; the verifier update is implicit.**
+Sections: Key Components 10 / TESTS "New" ("S0: api-pin, bundle gate"); S1 row
+("barrel gains env/ua"); Interface "Root barrel" (`export { default as env } …
+// S1`; `ua … // S1`); "Supported deep-import inventory" (lists `env`, `ua`).
+Why it matters: the pin test is CONST-P4's mechanical tripwire and the inventory
+is its data; S1 adds two public exports (env, ua) plus their deep-import paths.
+S1's TESTS enumeration ("env units …, emulation parity") names no pin-test or
+inventory update. It would fail loudly rather than go stale-green, but create-beads
+should inherit an explicit REQ, not an implied one.
+Suggested fix: S1 row/TESTS gains one item — "api-pin inventory + barrel
+assertion updated (+env, +ua; pin test green in the same commit)". (S6's mirror
+mutation is already scheduled: "`jquery` paths vanish at S6 (the pin test then
+asserts the import rejects)" — inventory section. ✓)
+
+**SF-4. Final budget caps "at S6" are named but never scheduled.**
+Sections: Key Components 10 ("gz-byte caps, measured+10% headroom today, final
+caps ~13 kB gz desktop / ~14 touch at S6"); Slice table S6 row (no caps item);
+TESTS S6 (no caps item).
+Why it matters: tightening caps is a ratchet amendment per KC10's own semantics
+("grow only with explicit amendment"); as written the amendment has no owner
+slice, so either S6 silently skips it or an implementer discovers an unscheduled
+REQ at spec time.
+Suggested fix: add "bundle-budget.json final-cap amendment (~13/~14 kB gz)" to the
+S6 outcome cell, or delete "at S6" from KC10 and leave the S0 caps as the series'
+binding numbers.
+
+**SF-5. Loader canonical path is inconsistent across three sections — S3's barrel/pin disposition is ambiguous.**
+Sections: Key Components 7 ("Loader (`loader/loader.js`, S3)"); Interface "Root
+barrel" (`export { default as loader } from 'bem:loader_type_js'`); "Supported
+deep-import inventory" ("loader (js)").
+Evidence @ f2ab61e: `common.blocks/loader/` contains only `_type/loader_type_js.js`
+and `_type/loader_type_bundle.js` — no `loader/loader.js` exists, so KC7 names a
+new canonical path while the end-state barrel and pinned inventory keep the old
+one. Post-S3 either (a) the implementation stays at `loader_type_js` (KC7's path
+is wrong), or (b) `loader/loader.js` is canonical and the barrel + pin inventory
+change in S3 — unscheduled (same class as SF-3), and the end-state barrel would
+then import through the *deprecated* one-release re-export, breaking when the
+re-export dies.
+Suggested fix: pick one canonical path. If `loader/loader.js`: Interface barrel
+becomes `from 'bem:loader'`, deep-import inventory gains it, the deprecated
+re-export is the old `loader_type_js` path, and S3's row/TESTS gain "barrel +
+pin-inventory switch". If the old path stays canonical: correct KC7 to
+`loader/_type/loader_type_js.js` and note the file is rewritten in place.
+
+**SF-6. The CONST-P1 ratchet only catches additions — a forgotten shrink passes silently until S6.**
+Sections: Key Components 10 ("per-slice binding from S0 = gz-byte caps + the
+CONST-P1 allowlist ratchet + CONST-P6 baseline ratchet"); Key Components 13
+(CONST-P1 final predicate); CONSTITUTION.md CONST-P1 sdd-check (repo evidence:
+`comm -23` JQ ALLOW — set difference only in the additions direction).
+Why it matters: "Ratchet diffs across the series ARE the machine-readable
+migration history" (Data Model 5) — a slice that migrates a consumer but forgets
+the allowlist edit stays green through S1–S5 (stale entries are invisible), and
+the error surfaces only at S6's binding predicate, where attribution is lost.
+Same asymmetry applies to the CONST-P6 baseline ratchet.
+Suggested fix: S0's gate upgrade adds the reverse difference — fail when
+ALLOW−JQ ≠ ∅ (allowlist entry whose file no longer consumes) — or, more simply,
+each slice's done-gate grep predicate pins the exact expected allowlist/baseline
+contents after its Δ. One clause in KC13 (or KC10's staging paragraph) suffices.
+
+### Lenses with no findings (checked explicitly)
+
+- **S4 needs no S1 edge** ("events on touch payload while ua still forked?"):
+  no — the delegation engine and the interim trio sources contain zero ua/env
+  reads (verified `__events.js`, `__events_type_dom.js`, `__events_type_bem.js`,
+  `__init_auto.js`, `i-bem-dom.js` imports); the touch payload's forked ua is
+  orthogonal to common events code; focus-delegation tests run on chromium.
+  Checked, clean.
+- **Interim trio × S3 loader ordering**: zero loader references in any trio file
+  (verified) — no edge, no ordering constraint between S3 and S4/S5. Checked, clean.
+- **{S1,S3}→S6 fan-in complete and minimal**: complete (release prep + enforcement
+  needs all slices; S2/S4 arrive transitively) and minimal (no removable edge: S3's
+  only S6 contribution is release-prep-role, but that role is S6's stated scope).
+  Checked, clean.
+- **CONST-P6 −3 inside S1 as scoped**: achievable — desktop/touch ua JS forks
+  deleted (no `common.blocks/ua/ua.js` exists today; S1 creates the common base),
+  touch `ua__dom` becomes a transformer delta over a new common `__dom` ancestor,
+  and no template changes are needed: touch ua bemhtml/bh already have common
+  ancestors (verified), `ua__dom` has no templates. Checked, clean.
+- **Bench placement** (lands S2, done-gate for S4/S5): right placement — harness
+  precedes its consumers, S2→S4 edge exists, Q6's human answer (bench survives as
+  the perf harness for the i-bem-dom rework) is honored. Checked, clean.
+- **S4+S5 merge fallback vs two separately-gated stages**: consistent — Risks row
+  and Implementation Plan ("S4 spec pre-authorizes the S4+S5 merge fallback")
+  cross-reference, and the two-internal-stages wording preserves C2 (prd-align-2
+  CC-F4). One note: if the fallback fires, MF-1's analysis is unchanged (allowlist
+  ∅ lands with the convoy's S5 stage, wrapper deletion still after). Checked, clean.
+- **Same-commit ratchet ordering** (edits ride the slice commit vs gate in CI on
+  the same commit): consistent for every slice except S5 — which is MF-1. Checked,
+  otherwise clean.
+- **Shim-map ratchet circularity** (decided S0 spec-craft, first entries S2,
+  plugin-test home): no circularity — decision point precedes first use; the
+  plugin-test home assertion can be added lazily at S0 with zero S2 dependency.
+  Checked, clean.
+- **Parity anchoring consistency**: S0 tags `v5-base`@7a9e932 (per Q1; S0 row),
+  bench thresholds are ratio-to-v5-base (tag-consistent), f2ab61e greps carry the
+  reconciled proxy note (prd-align-2 CC-F5). Consistent. (How the v5-base baseline
+  is mechanically built for the bench ratio — tag checkout vs committed numbers —
+  is unnamed but is S2 spec-craft territory, not a sequencing break.)
+- **S0 internal ordering**: ~12 independent fence deliverables in one ≤12-REQ
+  slice is at-cap but coherent — they form the verification fence by design and
+  need no internal ordering; only MF-2 (generation switchover) and SF-2 (plugin
+  validation) should be pinned *inside* S0. Checked, acceptable; flagged via MF-2/SF-2.
+
+## Confidence
+
+High. All load-bearing claims were verified directly against the repo @ f2ab61e
+(hand-list imports, ua/env readers repo-wide, loader dir shape, package.json
+peer/dev/jquery + repository.url, CONST-P1 allowlist file-for-file, standalone
+CONST-P6 inventory, loader×jquery independence). MF-1 follows from the doc's own
+stated arithmetic ("∅ after S5") plus verified jquery-in-payload facts — no
+speculation. MF-2's breakage mode (unresolvable `bem:` specifier after deletion)
+is mechanical. The judgment-graded items are SF-1 (the soft edge might have an
+unstated bench-baseline rationale — the fix handles both cases) and the S3→S6
+minimality verdict (role-based edges are a matter of stated scope, not mechanics).
+Sequencing interactions that depend on unresolved OQs (OQ-1 bench cadence, OQ-3
+scope anchor, OQ-5 shim home, OQ-6 keyboard fate, OQ-10 bada/wp) were checked for
+ordering coherence with their named decision points and none creates a cycle or a
+use-before-decision hole.

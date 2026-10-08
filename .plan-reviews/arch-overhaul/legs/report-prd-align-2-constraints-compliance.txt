@@ -1,0 +1,131 @@
+# PRD-align-2 · constraints-compliance
+(review_id=arch-overhaul, review_phase=prd-align-2, leg=constraints-compliance; inputs: prd-draft.md incl. binding Q1–Q10, design-doc.md @ prd-align-1 state, CONSTITUTION.md, prd-align-round-1.md; repo evidence re-verified read-only @ f2ab61e)
+
+## Summary
+
+The design doc as written is **constraints-compliant**: every constraint in the
+inventory (CONST-P1..P5, PRD C1–C6, business Q-answers) is either satisfied or
+explicitly reconciled. **0 must-fix, 7 should-fix.** All should-fixes are
+documentation-consistency defects (stale number, implicit migration line,
+unspecified guard mechanism, fallback wording, one anchor conflation, an
+amendment-process sentence, a PRD-side declaration gap) — none changes the
+architecture or the slice arithmetic.
+
+Key re-verifications performed against the repo @ f2ab61e:
+- CONST-P1 grep reproduces **exactly the 9 allowlist entries**; the design's
+  deltas −1(S1) −3(S2) −2(S4) −3(S5) are disjoint and exhaustive → ∅ after S5.
+- CONST-P6 standalone inventory: all **7 groups / 12 files exist** (note:
+  winresize lives at `desktop.blocks/jquery/__event/_type/…`, not
+  `__event_type_*` — the design's enumeration is by module name and is correct).
+- package.json @ f2ab61e: `exports."." = ./dist/desktop/bem-core.mjs` (root is
+  today the auto-init payload), `engines.node = >=20`, `version 5.0.0`,
+  `repository.url` still upstream `bem/bem-core`, jquery in peer+devDeps —
+  all consistent with the design's S0/S6 claims.
+- Git: f2ab61e's parent is 7a9e932; `refs/tags/v5-base` on origin points at
+  7a9e932; the local clone carries a dangling `v5-base` tag ref (matches Q1's
+  "stale clone" remark; S0 tag reconciliation covers it).
+- Numbers: 38.5 kB → 12–13 kB gz = −66…−69% ✓; 27.53 kB jquery + 1–2 kB native
+  ≈ 12–14 band ✓; caps ~13 desktop / ~14 touch consistent across Exec Summary,
+  KC10, D-10/D-15.
+
+## Compliance matrix (constraint → verdict → design-doc section)
+
+| Constraint | Verdict | Evidence (section + quote) |
+|---|---|---|
+| CONST-P1 jquery ratchet | RESPECTED | Slice table (CONST-P1 Δ column: "−1 (S1) −3 (S2) −2 (S4) −3 (S5)"); KC13 "CONST-P1 gains its final multi-grep predicate … in S0; … skip/preview mode until the allowlist reaches ∅"; position 6 "each slice PR edits the constitution allowlist in the same commit (CONST-P1 PR clause)". Grep-verified: deltas map entry-for-entry onto the 9 allowlist files; the pre-existing ratchet check still executes per constitution header (spec-craft + done-gate) throughout S1–S5, so no new consumer can slip in while the final predicate previews. |
+| CONST-P2 ESM-first | RESPECTED | KC10 "`build/check-bundle-size.mjs`" + `specs/bundle-budget.json` (ESM/data only); D-14 "drop UMD dist format with the wrapper (S6) … CONST-P2 alignment"; no new UMD/CJS anywhere in the design. |
+| CONST-P3 platform override-only | RESPECTED (one stale number — F1) | KC13 "New CONST-P6 ancestor-existence check (every file in a platform level … must have a `common.blocks` ancestor …) with the verified baseline @ f2ab61e: 7 standalone module groups (12 files)"; Data Model 2 normative glossary (base / transformer override / side-effect refinement / standalone); S1 row "common ua base gains `__dom` elem ancestor (touch `ua__dom` becomes its override delta — CONST-P6 −3 groups)". Neither over- nor under-enforces: standalones ride a shrinking baseline (ratchet, not retro-ban); transformer-form hard error (KC9) polices redefinition chains; "no logic duplication" stays prose-attested, which CONST-P3 itself does not require to be machine-checked (G6's "checked (lint/rule) and documented" is met). |
+| CONST-P4 API shrinks only w/ migration | RESPECTED (one implicit line — F2) | Interface/pinned inventory + D-7 "Named-export barrel at root; … No invented/prefixed exports"; position 3 "each signature change ships with a bilingual MIGRATION entry in the same slice; the API-pinning test is the tripwire"; DOM type contract table "(CONST-P4 migration table, condensed)". Additions all Q-grounded: env + ua alias (Q5), barrel names from Q3's block list (i-bem, i-bem-dom incl. __collection, events incl. Emitter/Event/channels, dom, loader, ua/env) + US1 named-import story, `./build/plugins/*` (Q3). Nothing else invented. |
+| CONST-P5 hard fork @ v5-base | RESPECTED | No upstream re-sync anywhere; D-1 "Delete the jquery wrapper outright; no compat shim"; KC13 "CONST-P5: LICENSE.txt + file-level MPL-2.0 notices preserved through S6 deletions and README/doc rewrites; S6 done-gate includes a notices-intact grep"; LICENSE.txt verified present @ f2ab61e. |
+| PRD C1 constitution is law | RESPECTED (make amendment ride-along explicit — F6) | S0 row "CONST-P6 skeleton (baseline 7, verified)"; KC13 final predicate added "in S0"; position 6 same-commit discipline. Both amendments (new CONST-P6 clause, CONST-P1 predicate) scheduled in S0 via the slice PR = the constitution-header review process. |
+| PRD C2 strangler discipline | RESPECTED (fallback wording — F4) | Slice table: 7 slices S0–S6 (within ~6–8); REQ est column all ≤12 (11–12, 8–12, 6–8, 4–6, 8–12, 8–10, 8–10); position 6 "Every slice leaves `v5` buildable and tests green (C2)"; staged gates (KC10/KC13) keep per-slice CI green; S4 row "bem-type interim interop REQ + mixed-flow test"; Risks row "pre-authorized fallback: merge S4+S5 beads into one convoy with two internal stages". Periphery→core order preserved (env/ua, periphery+DOM facade, loader → native events → registry events → deletion/enforcement). |
+| PRD C3 machine-checkable done-criteria | RESPECTED (guard mechanism — F3) | Implementation Plan done-gate "`npm run lint && npm test && npm run test:browser …` + the slice's grep predicates (allowlist state, budget green) + constitution sdd-checks"; KC10 bundle-budget JSON ratchet; KC11 bench "ratio-to-v5-base thresholds ≤1.10×"; KC13 grep predicates; S0 row "API inventory + pin test"; doc-parity fence KC13. |
+| PRD C4 parity by default, documented breaks | RESPECTED (root-export line — F2) | Every break enumerated and grounded: parseHtml scripts-inert D-11 (+ "targeted grep/spec audit … first REQ of S2" escape hatch); loader ES-only shift (Loader surface "classic scripts defining globals no longer execute" + US6 migration line); ua removed fields (D-13 once-warn Proxy + Risks "MIGRATION notes name every removal"); `bemDom.scope` "explicit throw if body genuinely absent (replaces silent-null footgun)" (DOM contract); "`$(node).bem()` plugin DELETED … migrate to `bemDom.initOnDom`" (DOM contract + Q2/D-1); `file:` fix removal (semantics table). Undocumented-change sweep: no other observable public-API change implied — delegation engine "Absorbs the delegated self-match quirk by design", focus/blur mapping table, Q10 caveats "as named parity tests", static-snapshot DOM contract is itself the migration table. |
+| PRD C5 Node ≥20 / evergreen, no IE/legacy | RESPECTED | S0 row "Node floor pinned"; CI wiring "Node matrix aligned to the picked floor ([20,24])" (engines >=20 verified); S6 row "`page__conditional-comment` deleted as IE relic"; no polyfills anywhere; env.browser opera/chrome retention is one-release deprecation parity, not legacy support. |
+| PRD C6 vision-only convoy | RESPECTED | All checks/scripts/specs/bench/gates are slice-scoped future content ("S0 — bundle gate appended", "S2 — bench project"); design doc contains no implementation code and no present-tense execution. |
+| Q8 chromium-only + desktop-parity | RESPECTED (PRD-side declaration gap — F7) | D-15 "Chromium-only + desktop-parity verification matrix; touch-emulated Playwright project from S1 (Q8)"; S1 row "touch-emulated Playwright project"; done-gate "--project=chromium[,touch-emulated][,bench]"; Risks "Touch behavior unverifiable before S1 → … S1 acceptance". |
+| Q9 one human-cut 6.0.0 | RESPECTED | D-12 "One 6.0.0 at the end; version stays 5.0.0 through the series (Q9)"; S0 row "`repository.url` fix" (verified still upstream today); S6 row "MIGRATION/CHANGELOG consolidated for human-cut 6.0.0". |
+| Q1 anchor tag v5-base@7a9e932 in S0 | RESPECTED (one conflation — F5) | S0 outcome "tag `v5-base`@7a9e932"; Problem Statement "observable behavior matching tag `v5-base` (7a9e932)". Origin tag verified at 7a9e932; local clone's tag ref is dangling (stale-clone artifact, covered by S0). |
+| Q6 benchmarks kept + migrated in jquery slice | RESPECTED | S2 row "dom + idle + winresize + benchmarks off jquery … bench project B1–B6 on ratio thresholds"; KC11 "the done-gate for S4/S5"; Q7 bundle loader "deleted (dead ym format, Q7)" with bilingual note. |
+
+## Findings
+
+**[must-fix]** — none.
+
+**F1 [should-fix] — CONST-P6 baseline says "3" in Data Model (stale pre-align-1 number).**
+Trace: CONST-P3 / GA-F1 residue. Data Model 5 Ledgers: "CONST-P1 allowlist
+(9→∅), **CONST-P6 baseline (3→∅)**" contradicts the verified and normative
+KC13 "7 standalone module groups (12 files)" and the Exec Summary ("**7
+standalone module groups → ∅**"). Same defect class prd-align-1 GA-F1 closed;
+the fix missed this instance. Suggested edit: Data Model 5 → "CONST-P6
+baseline (7→∅)".
+
+**F2 [should-fix] — S0 root-export repurpose has no explicit consumer migration line.**
+Trace: CONST-P4 / PRD C4. Position 1 + D-7 repurpose root `.` from today's
+auto-init payload (verified: `exports."." = "./dist/desktop/bem-core.mjs"`)
+to a "never auto-inits" barrel, with payloads moving to `./dist/{desktop,touch}`.
+The change is documented as design, but the consumer-facing migration line
+("side-effect consumers: `import 'bem-core'` → `import 'bem-core/dist/desktop'`
+(or `./dist/touch`)") appears nowhere in the DOM/loader migration tables or the
+S0 MIGRATION cell — it is only implied by the per-slice ledger discipline.
+Suggested edit: add the entry-point migration line to Design position 3 (or the
+S0 row's MIGRATION cell) so the break is enumerated like the other six.
+
+**F3 [should-fix] — skip/preview guard mechanism for final-state predicates unspecified.**
+Trace: PRD C3 (+ CONST-P1 staging). KC13 says the CONST-P1 final predicate
+"runs in skip/preview mode until the allowlist reaches ∅ and is conclusive
+(binding) at S6"; KC10 stages the bundle gate's final assertions likewise. The
+intent is sound (verified GA-F2 fix), but the design never states the concrete
+guard that keeps the S0-amended sdd-check exit-0 while the allowlist is
+non-empty (e.g., predicate short-circuits to preview output + exit 0 when
+ALLOW ≠ ∅; binding otherwise). Without it, the amendment is not yet
+machine-checkable per the constitution's exit-0 = OK contract. Suggested edit:
+one sentence in KC13 specifying the guard form (and mirroring it in KC10).
+
+**F4 [should-fix] — pre-authorized S4+S5 fallback can breach the ≤12-REQ slice cap.**
+Trace: PRD C2. Risks: "pre-authorized fallback: merge S4+S5 beads into one
+convoy with two internal stages if interop exceeds ~2 REQ of shim work". S4
+(8–12) + S5 (8–10) merged = one convoy of up to ~22 REQ, exceeding C2's
+"≤12 REQ each" and the DAG section's "each convoy ≤12 REQ beads" as written.
+Suggested edit: state that the fallback preserves two separately-gated internal
+stages (each ≤12 REQ, convoy shippable only when both are green), or record an
+explicit coordinator-approved cap waiver for that single fallback convoy.
+
+**F5 [should-fix] — "v5-base/f2ab61e" conflation in the Retired subsection; no explicit anchor reconciliation.**
+Trace: Q1 (binding). "Retired during prd-align-1": "grep-verified zero pointer
+code at **v5-base/f2ab61e**" labels f2ab61e as v5-base, contradicting Q1
+(v5-base = 7a9e932 ≠ f2ab61e). Verified: f2ab61e = 7a9e932 + the constitution
+commit (parent chain), so evidence-greps at f2ab61e are valid proxies for the
+7a9e932 parity anchor — but the doc never says so. Suggested edit: reword to
+"@ f2ab61e (v5 head; = v5-base@7a9e932 + constitution commit, no blocks
+touched between)" and add the same one-line reconciliation near the header's
+"repo @ f2ab61e" evidence note.
+
+**F6 [should-fix] — S0 constitution-amendment process not stated explicitly.**
+Trace: PRD C1. The design introduces CONST-P6 and amends CONST-P1's predicate
+in S0; CONSTITUTION.md's header requires such changes to pass a PR ("the PR is
+the review"). Position 6 covers per-slice allowlist edits, but no sentence says
+the two S0 constitution amendments themselves ride the S0 slice PR as that
+review vehicle. Suggested edit: add to KC13 or the S0 row: "adding CONST-P6
+and the CONST-P1 final predicate are constitution amendments carried by the S0
+slice PR (constitution-header review process)".
+
+**F7 [should-fix, PRD-side] — Q8's "declare in Constraints (C4) NOW" not reflected in PRD C-section text.**
+Trace: Q8 (binding) / PRD C4. Q8 ordered the chromium-only + desktop-parity
+matrix declared in the PRD's Constraints (C4) section; prd-draft.md's C4 text
+still reads only "Behavior parity by default…". The binding Q8 amendment and
+the design's D-15 satisfy the substance, so this is PRD hygiene, not a design
+defect. Suggested handling: coordinator either patches the PRD C4 wording or
+records that D-15 is the operative C4 declaration (one-line note in the PRD
+review log). No design-doc edit required.
+
+## Confidence
+
+High for everything repo-verifiable (allowlist arithmetic, standalone
+inventory, package.json/git facts, number consistency) — re-verified directly
+@ f2ab61e. Medium-high for the interpretive gradings (F2 classification of the
+root-export line as should- rather than must-fix: the change IS documented in
+the design, only the enumeration line is missing; F4: assumes "two internal
+stages" was meant to preserve the REQ cap — if the merged convoy were meant to
+behave as one ≤12-REQ slice, this would flip to must-fix). No constraint was
+found violated, worked around, or silently amended.

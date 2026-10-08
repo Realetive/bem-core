@@ -1,0 +1,98 @@
+# PRD-align-3 · user-stories-coverage
+(review_id=arch-overhaul, review_phase=prd-align-3, leg=user-stories-coverage; report by gastown.furiosa @ design-doc prd-align-2 state; repo evidence @ f2ab61e, branch v5 — verified read-only)
+
+## Summary
+
+Walked US1–US6 clause-by-clause against the CURRENT design doc (prd-align-1 + prd-align-2 folded in). Result: **30 story clauses — 22 COVERED / 7 PARTIAL / 1 MISSING**; **1 [must-fix], 6 [should-fix]**.
+
+- The allowlist arithmetic (US2) is exact against the repo: all 9 CONST-P1 entries match real `.deps.js` jquery refs, each removed exactly once (S1 −1, S2 −3, S4 −2, S5 −3 = ∅ after S5). Spec line counts quoted by the design verify exactly (dom.spec.js 159L, i-bem-dom.spec.js 1854L, events_type_dom 1069L, events_type_bem 1013L).
+- The US1 tree-shaking re-scope is the model case: visible and coherent (Design position 5 + Risks row), not a quiet drop. No OTHER story clause hides inside a Non-Goal — with one exception discovered this round: **US3's "docs tell me where shared behaviour goes" (G6's "documented" half) is squeezed out by the S6 docs-pass bound ("content redesign out of scope") and an unscoped "README rewrite"** → the one [must-fix].
+- Q1–Q10 amendments are all reflected in the stories' carriers (Q1 anchor 7a9e932 + S0 tag; Q2 no shim; Q3 inventory; Q4 inherit frozen; Q5 env scoping incl. bada/wp; Q6 bench kept in S2; Q7 bundle-loader deletion; Q8 D-15 matrix; Q9 one release D-12; Q10 registry D-3).
+- One repo fact contradicts a story-derived line in the design: **`loader_type_js` @ f2ab61e is a callable default export `(path, success, error)` — there is no `.get` method anywhere** (loader dir + spec both use direct calls). The design's US6 migration line repeats the PRD's stale `.get` form.
+
+## Coverage matrix (story clause → design-doc section → verdict)
+
+| Story clause | Design carrier | Verdict |
+|---|---|---|
+| US1a `import { BemDom } from 'bem-core'` | Interface › exports (S0: "." → dist/index.mjs) + Root barrel (`export { default as bemDom }`) | **PARTIAL** — named root export exists; casing `BemDom` vs `bemDom` unreconciled (F1) |
+| US1b bundle contains no jQuery | KC 10 (staged bundle gate; final assertions activate S6 / auto at allowlist ∅), S6 row (peer+devDep removal), CONST-P1 ∅ after S5 | COVERED |
+| US1c tree-shaking works | Design position 5 ("US1 stays scoped to 'no jQuery in bundle'") + Risks "Scope creep" row + plugin public at ./build/plugins/* | COVERED (explicit, visible re-scope) |
+| US1d nothing regresses vs v5-base | Design position 3 (C4/CONST-P4 + MIGRATION ledger), S0 api-pin test, per-slice TESTS pinned-green, S1 emulation parity, KC 11 bench ≤1.10×; interim honesty carried by Q9/D-12 (no intermediate publishes) | COVERED |
+| US2 touch.blocks/ua | S1 row + KC 1–2 + env/ua surface (env public module; ua Proxy alias; common base + __dom ancestor) | COVERED |
+| US2 dom | S2 row ("dom/idle native") + KC 3 (DOM facade) | COVERED |
+| US2 idle | S2 row ("idle native") | COVERED (target) — test carrier unnamed (F4) |
+| US2 benchmarks page | S2 row + KC 11 (bench B1–B6) + Q6 | COVERED |
+| US2 __events | S4 row (−2) + KC 4 (per-scope native engine) | COVERED |
+| US2 __events_type_dom | S4 row + TESTS pinned-green (1069L) | COVERED |
+| US2 i-bem-dom | S4 interim note + KC 6 (progressive decomposition) + S5 row (−3) | **PARTIAL** — per-file "to what" not itemized (F5) |
+| US2 __init_auto | S4 interim note (trio) + S5 row (−3) | **PARTIAL** — replacement path unspecified (F5) |
+| US2 __events_type_bem | S5 row + KC 5 + D-3 (pure registry, 3 caveats as named tests) | COVERED |
+| US2 allowlist arithmetic 9→∅ | Exec Summary + slice-table Δ column; repo-verified exact (each consumer exactly once) | COVERED |
+| US2 "CONST-P1 no longer lists it" | Design position 6 (allowlist edited in same slice PR) | COVERED |
+| US2 "Playwright stays green" per consumer | TESTS checklist (pinned-green per slice) | **PARTIAL** — idle, __init_auto have no named carrier (F4) |
+| US3 "CI rejects standalone touch file" | KC 13 (CONST-P6 baseline ratchet, machine check; rejects new standalones from S0) | **PARTIAL** — not wired into ci.yml; enforcement point implicit (F3) |
+| US3 "docs tell me where shared behaviour goes" | S6 row ("README/README.ru rewrite + docs bounded to an API-accuracy pass … content redesign out of scope") | **MISSING** (F2) |
+| US3 override ergonomics / discoverable error | KC 9 (transformer-form hard error) + Misuse error experience ("build error naming both files") | COVERED |
+| US4 ≤12 REQ per slice | Slice table REQ est (11–12/8–12/6–8/4–6/8–12/8–10/8–10; fallback two gated stages per CC-F4) | COVERED |
+| US4 explicit deps / DAG | Slice table Deps column + "DAG shape" sentence + Bead DAG paragraph | COVERED |
+| US4 done-criteria incl. MIGRATION cells | Implementation Plan ("allowlist deltas, TESTS checklist, and MIGRATION cells … become per-slice done-criteria" + MIGRATION ledger discipline) | COVERED |
+| US4 mechanically verifiable | Done-gate (lint/test/test:browser + grep predicates + sdd-checks) | **PARTIAL** — S3 has no allowlist delta and no named closure predicate (F6) |
+| US5 documented per-slice verification recipe | Implementation Plan › TESTS checklist contract + Done-gate | COVERED |
+| US5 v5-base anchor reconciliation | Exec Summary evidence note + Retired subsection ("@ f2ab61e (v5 head = v5-base@7a9e932 + the constitution commit … valid parity proxy)") + S0 tag creation | COVERED |
+| US5 bench ratio-to-v5-base as evidence | KC 11 (≤1.10×, done-gate for S4/S5) | COVERED |
+| US5 "including the 9 frozen consumers' scenarios" | TESTS pinned-green (dom 159L, loader 33L, type_dom 1069L, type_bem 1013L, i-bem-dom 1854L) + S1 emulation parity + B1–B6 | **PARTIAL** — idle, __init_auto unnamed (F4) |
+| US6 "keeps working" arm | KC 7 (one-release deprecated re-export at old deep-import path) + pinned inventory "loader (js)" + TESTS S3 (re-export once-warn) | COVERED |
+| US6 one-line migration arm | Loader surface ("US6 migration line … → import(url)") + ES-only shift documented + bilingual via MIGRATION ledger + misuse note | **PARTIAL** — line cites stale `.get` call form (F7) |
+| US6 deep-import still public | Interface › pinned deep-import inventory ("loader (js)") | COVERED |
+
+Non-Goals cross-check: only US1c (tree-shaking) is a Non-Goal-adjacent clause and it IS explicitly reconciled. US3's docs clause is NOT a Non-Goal (it is G6's "documented" half) yet is effectively excluded by the docs-pass bound → F2. Q cross-check: all Q-amended story clauses carry the amended form (Q1/Q2/Q3/Q5/Q6/Q9/Q10 spot-verified in the matrix above).
+
+## Findings
+
+### F2 [must-fix] — US3/G6 "docs tell me where shared behaviour goes" has no concrete carrier
+- Story clause: US3 "docs tell me where shared behaviour goes"; G6 "the boundary is checked (lint/rule) **and documented**".
+- Sections: "Proposed Design › Slice series" S6 row — "README/README.ru rewrite + docs bounded to an API-accuracy pass (…; content redesign out of scope, deferred post-6.0.0)"; "Risks and Mitigations" docs row — "content redesign out of scope, deferred post-6.0.0".
+- Why: the only textual carriers are (a) an unscoped "README/README.ru rewrite" (content never enumerated — an engineer picking up S6 cannot know it must contain contributor guidance) and (b) a docs pass explicitly bounded to API accuracy with content redesign deferred. Neither names where the override-only rule, transformer form, or "shared behaviour goes in common.blocks" is documented for contributors; the explicit deferral actively reads as cutting the clause. The check half of G6 is well carried (CONST-P6, KC 9); the documented half is not.
+- Suggested edit (S6 row + Risks docs row): scope the README rewrite to a named, bounded contributor section — e.g. "README/README.ru rewrite scoped to include 'Platform levels are override-only': shared behaviour lives in common.blocks, overrides must be transformer-form `export default function(prev)`, CONST-P6 ancestor-existence check (name + baseline semantics), and the plugin's build error naming both files; en/ru, anchor-fenced, 1-REQ-equivalent bound — bounded contributor guidance, not the deferred content redesign." Keeps NG-F1's deferral intact while giving G6/US3 a named carrier.
+
+### F1 [should-fix] — US1 barrel casing (`BemDom` vs `bemDom`) unreconciled
+- Story clause: US1 `import { BemDom } from 'bem-core'`.
+- Section: "Interface › Root barrel" — "export { default as bemDom } from 'bem:i-bem-dom';" (+ D-7; S6 docs remap covers legacy `BEMDOM.*` → `bemDom.*`, not the PRD's `BemDom`).
+- Why: the named root export exists (clause substantively covered), but the story's illustrative casing is never dispositioned — a reviewer walking US1 hits a silent mismatch.
+- Suggested edit: one sentence in the Root barrel block: "PRD US1's illustrative `BemDom` casing resolves to `bemDom` (D-7: plain unprefixed DOM-flavor names; no invented casing); legacy `BEMDOM.*` → `bemDom.*` is the S6 docs remap."
+
+### F3 [should-fix] — US3 "CI rejects" clause: CONST-P6 not wired into ci.yml
+- Story clause: US3 "CI rejects any file in touch.blocks that doesn't correspond to a common.blocks ancestor".
+- Sections: "Key Components 13" — "New CONST-P6 ancestor-existence check …" (runs as a constitution sdd-check at spec-craft/done-gate); "Implementation Plan › CI wiring" — "S0 — bundle gate appended to `build` job; api-pin joins the `test` node suite …" (CONST-P6 absent).
+- Why: the check exists, rejects new standalones from S0 (baseline ratchet), and the skip/preview guard is specified — but the enforcement point for a plain contributor PR is the repo CI, and CI wiring never mentions it. The clause is covered only implicitly via the workflow done-gate.
+- Suggested edit: add to the CI wiring S0 sentence: "CONST-P6 baseline check (and the CONST-P1 final predicate in its skip/preview form) ride the same `build` job as the bundle gate from S0" — or, if constitution-level enforcement is intended, state that explicitly and note the story's 'CI' wording is satisfied at done-gate + PR review only.
+
+### F4 [should-fix] — US2/US5 per-consumer test carriers missing for `idle` and `__init_auto`
+- Story clauses: US2 "tests (Playwright) stay green" (per consumer); US5 "including the 9 frozen consumers' scenarios".
+- Section: "Implementation Plan › TESTS checklist" — "Pinned-green — existing specs cited by path that must pass (S4: …; S5: …; S3: loader_type_js.spec.js; S2: dom.spec.js)".
+- Repo facts (@ f2ab61e): `common.blocks/idle/` has no spec corpus (deps/md/js only); no spec references idle; `__init_auto` (11 lines, `$(function(){ nextTick(init) })`) has no dedicated spec; idle is a platform-payload import (build/platforms/{desktop,touch}.js:48–49).
+- Why: 7 of 9 consumers have named verification carriers; the idle and __init_auto migrations would land with only transitive coverage, unstated.
+- Suggested edit: extend the TESTS parentheticals — "S2: dom.spec.js; idle has no spec corpus @ anchor — pin transitively via i-bem-dom.spec.js init flows or add a minimal idle unit (decide at S2 spec-craft)" and "S5: …; __init_auto pinned via the i-bem-dom.spec.js auto-init suites".
+
+### F5 [should-fix] — US2 S5 trio per-file migration targets not itemized
+- Story clause: US2 "which slice migrates it and to what (native DOM API / env module / registry)".
+- Sections: S4 row — "interim: the remaining allowlisted trio (i-bem-dom, __events_type_bem, __init_auto) is the sole jquery carrier until S5"; S5 row outcome — "registry containment-walk emit; three Q10 parity caveats as named tests; events_type_bem 1013L + i-bem-dom 1854L green; allowlist = ∅" (no per-file disposition).
+- Why: __events_type_bem → registry is explicit; i-bem-dom core (→ S2 facade + S4 engine remnants per KC 6 decomposition) and __init_auto (repo-verified jquery use = DOM-ready wrapper only) have derivable but unstated targets, so the −3 delta is less auditable than S4's interim note.
+- Suggested edit: extend the S5 outcome cell mirroring S4's note: "−3 disposition: __events_type_bem → pure registry; i-bem-dom → remaining jquery substrate replaced by S2 facade + S4 engine (KC 6 decomposition completes); __init_auto → native DOM-ready (DOMContentLoaded/readyState) + nextTick(init)".
+
+### F6 [should-fix] — US4 S3 closure predicate unnamed
+- Story clause: US4 "I can verify completion mechanically."
+- Sections: S3 row — "loader(url, success?, error?) …; loader_type_bundle deleted (bilingual note); classic-script semantic shift documented; internal-consumer audit"; Done-gate — "+ the slice's grep predicates (allowlist state, budget green)".
+- Why: S3 is the only slice with no CONST-P1 delta, and the generic predicate parenthetical names only allowlist/budget — S3's slice-specific closure greps are implicit.
+- Suggested edit: add to the S3 outcome cell: "closure predicates: zero `loader_type_bundle` references repo-wide; loader source contains dynamic `import(`; deprecated re-export present with once-warn."
+
+### F7 [should-fix] — US6 migration line cites a stale `.get` call form
+- Story clause: US6 "My runtime code that did `loader_type_js.get(url)` … or follows a documented one-line migration to `import()`".
+- Section: "Interface › Loader surface" — "US6 migration line: `loader_type_js.get(url)` → `import(url)`".
+- Repo facts (@ f2ab61e): `loader_type_js.js` default-exports a callable `(path, success, error)`; no `.get` exists in the loader dir, its spec (calls `loader('data:…', …)` directly), or any consumer; the docs (loader.en.md) document the callable form.
+- Why: the design repeated the PRD's stale `.get` form verbatim — same class of stale premise the round-1 retirement gave the G3 "timeout" parenthetical, but this one survived into the migration line. The keeps-working arm is unaffected (the deprecated re-export preserves the callable shape; promise return is additive).
+- Suggested edit: rewrite the line as "`loader(url, success?, error?)` → `import(url)` (PRD US6's `.get` form is stale @ the anchor — repo-verified, retired like the G3 timeout parenthetical); the deprecated deep-import re-export preserves the callable shape."
+
+## Confidence
+
+High. Every load-bearing repo claim re-verified read-only @ f2ab61e (branch v5): all 9 allowlist entries are real jquery `.deps.js` refs and map 1:1 onto the slice Δ column; spec line counts 159/1854/1069/1013 match; `i-bem-dom.spec.js:1813` region is the modules.define/re-declaration suite; loader callable/no-`.get`; idle has no spec; ua__dom reads `bada`/`wp` (:18–19); winresize/page__conditional-comment/page__icon/jquery__config baseline members exist; playwright config is chromium-only; package.json facts (root payload export, peer+devDep jquery, engines ≥20, repository.url upstream) as stated. Design-internal consistency checked against both round logs (no re-litigated findings; F2–F7 are new or tighten round-1/2 items). The one judgment call is grading F2 as must-fix rather than should-fix: the "README rewrite" could incidentally include contributor guidance, but an unscoped rewrite plus an explicit content-redesign deferral is not a carrier for a G6 requirement — flagged for the coordinator to weigh.

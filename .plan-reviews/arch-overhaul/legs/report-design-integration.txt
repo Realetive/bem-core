@@ -1,0 +1,283 @@
+# Design exploration (arch-overhaul): integration — slice DAG, code placement, rollout/compat, testing, CI wiring
+
+Inputs: prd-draft.md (incl. final human answers Q1–Q10), prd-review.md (6-leg synthesis), CONSTITUTION.md, sibling design legs (api/data/ux/scale/security reports in `.plan-reviews/arch-overhaul/legs/`). All repo facts verified @ v5 f2ab61e.
+
+## Summary
+
+The corrected facts collapse the PRD's 8-slice sketch into **7 slices (S0–S6)**: the
+pointer slice was phantom (no pointer code exists; only
+`desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.js` remains, IE8-dead),
+and the inherit "(a)-gate" is **not a slice** — it is a design-doc paragraph plus an
+S0 pin, because option (a) means *no code changes* to `inherit` (121 lines, frozen),
+and `i-bem-dom.spec.js:1813` already pins the dynamic-redefinition behavior it must
+keep. The allowlist arithmetic closes **one slice earlier than the review expected**:
+after S5 the CONST-P1 allowlist is already ∅ (9 entries: −1 S1, −3 S2, −2 S4, −3 S5),
+so S6 is purely wrapper deletion + platform enforcement + docs/release prep — the
+cleanest possible shippable tail.
+
+Integration-specific decisions this leg contributes to the design doc:
+
+1. **Final slice list S0–S6** with goals, REQ estimates (all ≤12), deps, per-slice
+   allowlist deltas, MIGRATION.md deltas, and done-criteria sketches (below).
+2. **S0 sized at 11–12 REQ — keep it one slice** (fold doc-policy into done-criteria);
+   split option documented if graph.v2 prefers smaller beads.
+3. **Code placement**: `env` = new common.blocks public block; delegation engine and
+   BEM-event registry = private internals under `common.blocks/i-bem-dom/__events/`;
+   DOM facade = private internal consumed via `bem:dom`'s module (implementation
+   hidden, never in the public export inventory); platform `ua` forks collapse to
+   transformer overrides over a new common ancestor. The S0 exports-map narrowing
+   (`./*` → `./common.blocks/*` + enumerated entries, api leg) is what makes
+   "internal by location, public by inventory" enforceable.
+4. **One real atomicity hazard**: S4 (dom-type native) × S5 (bem-type registry)
+   interim state — bounded by an explicit interop REQ + mixed-flow test in S4; all
+   other slice boundaries are independently mergeable to branch `v5` with tests green.
+5. **Per-slice "tests must exist before merge" checklist shape** mapped to the real
+   assets (i-bem-dom.spec.js 1854L, events_type_dom 1069L, events_type_bem 1013L,
+   loader_type_js.spec.js, ym shim corpus, >400 gate).
+6. **CI wiring per slice** — no new jobs; extend existing ci.yml jobs (lint/test/
+   test-browser/build/docs): bundle gate into `build`, touch-emulated + bench as
+   Playwright projects into `test-browser`, api-pin test into `npm test`.
+7. **Q10: ADOPT the pure-registry BEM events** — it is the keystone that lets S5 drop
+   `$.event.special` and makes wrapper deletion mechanical; S5 sizes at the **top of
+   its band (8–10 REQ)** because the three parity caveats each become named REQs.
+
+## Key Considerations
+
+- **Everything hangs off S0.** Every parity claim (C4/US5/CONST-P5) is unverifiable
+  until the annotated tag exists at 7a9e932 (Q1: pre-constitution snapshot; today
+  zero tags exist, verified). Likewise CONST-P4 policing is vacuous until the API
+  inventory + pin test + exports narrowing exist. S0 is a pure prerequisite — no
+  production behavior changes (exports narrowing changes *resolution*, not runtime
+  behavior; documented in MIGRATION).
+- **The events family is the critical path**: S0 → S2 (facade) → S4 → S5 → S6.
+  S1 (env/ua) and S3 (loader) are independent branches off S0; they only feed S6 as
+  "last consumers migrated" gates. This means **S1 and S3 can proceed in parallel
+  with the S2→S4→S5 chain** — the bead DAG should model that parallelism, not
+  serialize periphery work.
+- **Does S4 need the DOM type contract first?** Yes, but as a *pinned decision*
+  (S0 inventory: `Element`/`Element[]`, Q3) plus the *facade implementation* (S2,
+  first consumer `dom`), not as a separate slice. The delegation engine internally
+  speaks nodes natively; public signatures flip per-slice with MIGRATION notes.
+- **Where winresize folds**: S2. Delete
+  `desktop.blocks/jquery/__event/_type/jquery__event_type_winresize.*` outright
+  (IE8-dead, C5 modern-only; its `ua.msie` read dies with it per Q5). It is a
+  jquery-`__event_type` redefinition, but deleting it early is safe — it augments
+  jquery events that nothing in-repo dispatches. It also seeds the CONST-P6 baseline
+  shrink (`{desktop ua, touch ua, desktop winresize}` → data leg D2).
+- **Benchmarks (Q6 wording reconciliation)**: "migrate inside the jquery-removal
+  slice" — the benchmark *page deps* (`i-bem-dom.tests/benchmarks.blocks/page/page.deps.js`,
+  an allowlist entry, review: "easiest deletion") belong to **S2 periphery**, and the
+  rebuilt Playwright bench project (scale leg B1–B6, ratio ≤1.10× vs v5-base) should
+  land **in S2 as well**, so S4/S5 have before/after perf pins from day one. Wrapper
+  *deletion* stays in S6. Recommend the design doc adopt this reading explicitly.
+- **Branch discipline**: slices merge to **`v5`** (not main; ci.yml already PRs to
+  v5). Each slice PR = CONSTITUTION.md allowlist edit + MIGRATION.md/MIGRATION.ru.md
+  delta + specs — satisfying C2/C3/CONST-P1's "migration slice only" clause.
+- **Test harness is itself a jquery consumer**: `test/browser/entry.js` imports npm
+  jquery directly and `__init_auto.deps.js` deps `jquery`+`next-tick`; the G1
+  completion predicate must include the multi-grep (repo-wide `bem:jquery|from
+  'jquery'` = ∅ incl. harness and `desktop.blocks/jquery/*`) + no-jquery-in-dist
+  assertion (scale leg bundle gate) — allowlist=∅ alone is insufficient (review
+  finding #4).
+
+## Options Explored
+
+**Slice count.**
+- (A) PRD's 8 slices with pointer slice — refuted: no pointer code exists.
+- (B) Review's S0–S7 with S6 as inherit micro-slice — inherit (a) requires zero
+  code; a 2–4 REQ "slice" that produces only a decision is a design-doc paragraph +
+  an S0 REQ (decision recorded, pin test extended). Carrying it as a convoy bead
+  wastes a slice slot and invites scope creep into (b)/(c) research.
+- (C) **S0–S6 (chosen)**: fold inherit-gate into S0; renumber platform+wrapper
+  removal to S6. 7 slices, all ≤12 REQ, allowlist arithmetic closes after S5.
+
+**S0 shape.**
+- One 11–12 REQ slice vs split S0a (repo hygiene: tag, repository.url, test/dist
+  purge, specs/ convention, Node floor) / S0b (contracts: inventory+pin test, exports
+  narrowing, bundle gate, CONST-P6 skeleton, CONST-P1 predicate amendment, inherit
+  freeze). Chosen: **one slice**, folding doc-budget/policy items into done-criteria
+  lines rather than standalone REQs; document the split as fallback if spec-craft
+  bloats. Rationale: contracts without hygiene (or vice versa) leave the parity fence
+  half-built; all of S0 is low-risk, no production behavior change.
+
+**Code placement.**
+- Standalone public blocks for engine/registry/facade — rejected: violates the
+  spirit of CONST-P4 (internal structure must stay invisible) and the "no new public
+  API" Non-Goal; each would also need inventory entries.
+- `src/`-style private tree outside blocks — rejected: fights the vite-plugin
+  level/barrel model (bem: virtual imports resolve through levels) and the repo's
+  convention.
+- **Chosen**: private internals live inside the consuming block's elem namespace:
+  - `common.blocks/env/env.js` — the one NEW public module (Q5 explicit exception);
+    platform-neutral, no desktop/touch forks; evaluated once at module scope
+    (scale leg: document eval-once caching).
+  - Delegation engine + event normalization + BEM-event registry: internal files
+    under `common.blocks/i-bem-dom/__events/` (e.g.
+    `i-bem-dom__events.delegation.js`, `i-bem-dom__events.registry.js` — exact names
+    per scale leg's decomposition naming during S4/S5; they are NOT in the export
+    inventory).
+  - DOM facade (incl. security leg's `parseHtml` → scripts-inert): internal module
+    surfaced through the existing `bem:dom` module graph in S2; public `dom` block
+    API unchanged except the documented Element-type flip.
+  - `ua`: gain a **common.blocks/ua/ua.js** ancestor (env-reading implementation +
+    deprecated alias export, Q5 one-release lifetime); `desktop.blocks/ua` shrinks to
+    genuine deltas; `touch.blocks/ua` becomes transformer override(s)
+    (`export default function(base)`) supplying touch platform modifiers — the
+    reference example of CONST-P3 for the design doc's glossary.
+
+**Q10 architecture.**
+- Traditional native-bubbling emulation (dispatch real DOM events through the
+  entity tree) — rejected: re-imports DOM-event semantics BEM events deliberately
+  don't have (capture order, passive listeners), forces synthetic `Event` polyfill
+  shape, and keeps a coupling between bem-trigger and DOM dispatch that the wrapper
+  removal must then untangle.
+- **Pure registry (chosen)**: `trigger` walks the entity-containment tree calling
+  handlers directly; no `$.event.special`, no DOM participation. Integration
+  benefits: kills the last `$.event.special` use (mechanical wrapper deletion),
+  composes with scale leg Option-B delegation engine (both walk containment), and
+  the 1013L bem-type spec corpus pins observable semantics (onSetMods flows,
+  trigger data) that are registry-agnostic.
+
+## Recommendation
+
+### R1. Final slice DAG (S0–S6, all ≤12 REQ)
+
+| Slice | Goal | REQ | Deps | CONST-P1 allowlist Δ | MIGRATION.md Δ (en+ru) | Done-criteria sketch |
+|---|---|---|---|---|---|---|
+| **S0 prerequisites** | Verification fence + contracts | 11–12 | — | none; add multi-grep completion predicate to CONST-P1 sdd-check | exports-map narrowing note (`./*`→`./common.blocks/*`+enumerated) | annotated tag `v5-base`@7a9e932 pushed; repository.url fixed (Q9); public-API inventory doc + api-pin test green in `npm test`; exports narrowed; bundle gate (`specs/bundle-budget.json` + `build/check-bundle-size.mjs` + no-jquery-in-dist) wired into CI build job; `test/dist/` purged; `specs/` convention seeded; CONST-P6 ancestor-check skeleton + baseline `{desktop ua, touch ua, desktop winresize}`; CONST-P2 note + inherit (a) freeze recorded (pin: `inherit.spec.js` + `i-bem-dom.spec.js:1813`); Node-floor story picked (engines ≥20, CI matrix [20,24]) |
+| **S1 env/ua** | Capability env module; touch ua off jquery | 8–12 | S0 | −1 (`touch.blocks/ua/ua.deps.js`) | ua→env field mapping table; ua deprecated-alias note (one release, Q5) | `env` public block + unit specs scoped to audited inventory (touch `ua__dom` modifiers); common `ua` ancestor with alias export; touch ua = transformer override; touch-emulated Playwright project in CI (Q8); class-injection parity specs under emulation; desktop ua fork shrunk to deltas |
+| **S2 periphery** | dom + idle + winresize + benchmarks off jquery | 6–8 | S0 (facade contract from design doc); S1 soft (winresize `ua.msie` death) | −3 (`dom.deps`, `idle.deps`, `benchmarks page.deps`) | `dom` type contract flip (`Element`/`Element[]` for `contains`/`getFocused` etc.); winresize removal note (IE8-dead, C5); parseHTML scripts-inert note (security leg) | internal DOM facade module (incl. `parseHtml`, scripts-inert named test); `dom`+`idle` native (idle = 3 events on document); desktop winresize files deleted; bench project B1–B6 rebuilt with ratio thresholds vs v5-base; dom.spec.js green |
+| **S3 loader** | import()-based `loader_type_js`; delete `loader_type_bundle` | 4–6 | S0 | none | bundle-loader deletion note (bilingual, dead ym format, Q7); US6 one-line `import()` migration; `file:` protocol hack death (loader_type_js.js:49) | loader_type_js.spec.js green against import() impl; bundle block + specs + shim-map entry deleted (harness ratchet, data leg D5); internal-consumer audit REQ documented (i18n dynamic data etc.) |
+| **S4 events core** | Native delegation engine; dom-type events | 8–12 | S0, S2 | −2 (`__events.deps`, `__events_type_dom.deps`) | dom-event delegation semantics notes (focusin/focusout mapping, `delegateTarget`, `e.bemTarget`, delegated self-match quirk) | engine unit tests (compile-once matchers, composedPath walk per scale Option B); events_type_dom.spec.js 1069L green (adapted through harness); NEW focus-delegation specs; **interop REQ: bem-type events unchanged through interim** + mixed dom+bem flow test |
+| **S5 bem events + `$.fn.bem`** | Pure-registry BEM events (Q10); plugin off | 8–10 | S4 | −3 (`i-bem-dom.deps`, `__events_type_bem.deps`, `__init_auto.deps`) | `$(node).bem()` removal (i-bem-dom.js:912, Q2); three Q10 parity caveats documented | registry implementing entity-containment walk; events_type_bem.spec.js 1013L green; named parity tests: positional trigger args, `flags.fns` dedup, cross-node propagation-stop; i-bem-dom.spec.js 1854L green; **allowlist = ∅** |
+| **S6 platform + wrapper removal** | Delete wrapper; enforce override-only; release prep | 8–10 | S1, S2, S3, S4, S5 | allowlist field now empty; multi-grep predicate incl. harness + `desktop.blocks/jquery/*` + devDep removal | final 6.0.0 consolidation: wrapper + peer dep jquery ^4 + UMD global `bemCore` + bundle loader (fwd-ref) + ua alias EOL schedule + `$(node).bem()`; README/README.ru rewrite (ux leg R1) | `common.blocks/jquery` + `desktop.blocks/jquery/*` deleted; `npm ci && npm test && test:browser` green WITHOUT jquery devDep; dist artifact grep clean (bundle gate no-jquery assertion); UMD format dropped from build; CONST-P6 baseline ∅; CHANGELOG(.ru) Unreleased→6.0.0 staged for human-cut release (Q9) |
+
+Critical path S0→S2→S4→S5→S6; **S1 ∥ S3 parallel** off S0, joining at S6. Total ≈ 53–70 REQ.
+
+### R2. Atomicity hazards and how the boundaries hold
+
+1. **S4 × S5 interim (the one real hazard)**: between them, dom events are native
+   while bem events still ride jquery `$.event.special`. Interaction points: bem
+   `trigger` on a `domElem` collection (still `$(node).trigger`-based), and
+   dom-event handlers that trigger bem events (mods onSetMods chains). Bound it
+   with S4's interop REQ + mixed-flow integration test; if spec-craft shows the
+   interop is >2 REQ of shim work, merge S4+S5 beads into one convoy with two
+   internal stages (design doc should pre-authorize this fallback).
+2. **S1 × S6**: touch `ua__dom` is both a jquery consumer AND the env inventory
+   source — S1 must land before S6 (modeled as dep), but S1 does NOT wait on the
+   events chain.
+3. **S2 facade × S4 engine**: engine consumes facade (`parseHtml` not needed there,
+   but node helpers are). If S2 slips, S4's first REQ is "land facade" — soft
+   boundary, prefer keeping the dep honest.
+4. **Non-hazards** (verified separable): S3 loader touches nothing jquery;
+   winresize deletion (S2) is inert; benchmarks (S2) are perf-only; S0 changes no
+   runtime behavior; `__init_auto` (8 lines) dies trivially in S5 with the plugin.
+5. **Intermediate coherence**: `ua` alias + `env` coexist for one release (Q5);
+   import()-backed loader while wrapper exists — no interaction; allowlist
+   mid-states are the *point* of the ratchet — each slice PR edits CONSTITUTION.md
+   in the same commit, so HEAD is always predicate-green (C2).
+
+### R3. Per-slice testing checklist shape (goes into the slice-spec template)
+
+Each slice spec carries a **TESTS section** with four mandatory blocks:
+
+- **Pinned-green**: existing specs that must pass unmodified-or-adapted, cited by
+  path (S4: `__events/_type/i-bem-dom__events_type_dom.spec.js`; S5:
+  `..._type_bem.spec.js`, `i-bem-dom.spec.js`; S3: `loader/_type/loader_type_js.spec.js`;
+  S2: `dom/dom.spec.js`).
+- **New**: tests the slice adds (path + one-line "what it pins") — S0 api-pin +
+  bundle-gate; S1 env specs + emulation parity; S2 parseHtml-inert, bench B1–B6;
+  S4 engine units + focus-delegation + interop; S5 three caveat tests; S6
+  no-jquery-artifact + CONST-P6=∅.
+- **Deleted**: specs removed with their blocks + why (S3 bundle-loader specs; S2
+  winresize refs — none exist; S6 wrapper redefs).
+- **Harness Δ**: entry.js module-map ratchet entries, shim-allowlist changes,
+  browser.spec.js count-floor policy (data leg D5: registration accounting replaces
+  the hard-coded `>400` at test/browser.spec.js:35).
+
+Done-gate sdd-check per slice: `npm run lint && npm test && npm run test:browser
+-- --project=chromium[,touch-emulated][,bench]` + the slice's grep predicates —
+all machine-checkable (C3).
+
+### R4. CI wiring (no new jobs; extend ci.yml in-place)
+
+| Slice | CI change | Where |
+|---|---|---|
+| S0 | bundle-size + no-jquery assertion after build; api-pin test joins `npm test` node suite | `build` job += `node build/check-bundle-size.mjs`; `test` job unchanged (script already runs node --test list) |
+| S1 | touch-emulated Playwright project (`devices['Pixel 7']`-style context, hasTouch) | `test-browser` job: `npx playwright test --project=chromium --project=touch-emulated` |
+| S2 | bench project (`bench.spec.js`, ratio thresholds vs v5-base artifact) | same `test-browser` invocation += `--project=bench` |
+| S3–S5 | none — new specs auto-collect via entry shim (ratcheted) | — |
+| S6 | jquery devDep removal must keep `npm ci` green; UMD dropped from `npm run build`; node matrix aligned [20,24] (S0 decision) | matrix edit lands with S0's Node-floor REQ |
+
+No affected-packages/CI restructuring: single-package repo, full browser suite is
+minutes; cost of selectivity exceeds benefit. (The polecat rig's
+affected-tests hook is an agent-workflow concern, outside this repo.)
+
+### R5. Q10 — adopt pure-registry; S5 impact
+
+**ADOPT** (aligns scale leg rec #1 and Q10's human framing). Integration impact on
+S5: sizes at **8–10 REQ** (top of review band) because each parity caveat is a
+REQ + named test: (1) positional trigger args preserved through the containment
+walk; (2) `flags.fns` identical-handler dedup replicated; (3) propagation-stop
+honored across entity-tree nodes, not just same-node. Spec corpus impact:
+events_type_bem.spec.js is mostly registry-agnostic (pins onSetMods/trigger
+semantics); expect ~15–25 cases touching dedup/args/stop to need in-slice audit
+and possibly adaptation — budget one REQ for that audit. Traditional bubbling
+would inflate S5 and re-couple to DOM dispatch; registry keeps S6 mechanical.
+
+## Constraints Identified
+
+- C1–C6 as amended (C4 now declares chromium-only + desktop parity + the S1
+  touch-emulated project per Q8); CONST-P1's PR clause means allowlist edits may
+  only ride migration-slice PRs — the DAG must never batch two slices' allowlist
+  deltas.
+- Q1–Q10 answers are final inputs (no re-litigating wrapper deletion, bundle-loader
+  deletion, inherit freeze, env scoping, single 6.0.0, repository.url fix).
+- Exports-map narrowing (api leg, S0) is a hard prerequisite for the
+  internal-by-location placement strategy — without it every `common.blocks/*`
+  path is deep-import-public and "internal" is unenforceable.
+- CI budget: Playwright projects multiply runtime; bench must stay smoke-sized
+  (≤6 scenarios) or move to scheduled runs (open question).
+- `browser.spec.js` `>400` floor and the hand-maintained entry.js map are harness
+  debt each events-family slice must ratchet, not work around (data leg D5).
+- Bilingual doc parity is a per-slice budget (1 REQ-equivalent inside each slice's
+  done-criteria; ru-rot named as the historical failure mode).
+
+## Open Questions
+
+1. Bench in per-push CI vs scheduled job (cost vs regression latency) — decide at
+   S2 spec-craft.
+2. Final bundle caps: CI-only (`specs/bundle-budget.json`) vs promoted to a
+   constitution sdd-check at S6 (scale leg left it open; integration leg leans
+   CI-only + constitution keeps just the no-jquery predicate).
+3. S0 single-slice vs S0a/S0b split — coordinator's call at create-beads; both
+   shapes supplied above.
+4. Does anything internal consume `loader_type_js` at runtime (i18n dynamic lang
+   data?) — S3's audit REQ answers it; if yes, that consumer migrates inside S3.
+5. Touch-emulation device choice and whether desktop parity remains the only
+   release gate for the 6.0.0 cut (Q8 declares the matrix; device pin is S1 detail).
+6. API barrel timing: api leg shows the root named-export barrel as target-state;
+  integration leg recommends landing it in S0 with the pin test (US1 real early),
+  but if the barrel drags platform-entry decisions, defer to S6 — flag for
+  coordinator cross-leg reconciliation before create-beads.
+
+## Integration Points
+
+- **api leg**: S0 exports narrowing + inventory + pin test are prerequisites for
+  this leg's placement strategy (R1/S0 row); `env` naming/barrel interplay (OQ6
+  above); misuse-error experience depends on narrowing landing first.
+- **data leg**: CONST-P6 skeleton + baseline `{desktop ua, touch ua, desktop
+  winresize}` shrink schedule mapped 1:1 onto S1/S2/S6 rows; deps.js-as-manifest
+  and spec-harness ratchet adopted into R3 harness-Δ block; per-slice bilingual
+  bookkeeping adopted into every MIGRATION column cell.
+- **scale leg**: bundle gate in S0 (R4), bench B1–B6 in S2 (with Q6 wording
+  reconciliation), Option-B engine + decomposition naming inform S4/S5; WeakMap
+  state migration rides the S4/S5 engine work; final caps feed OQ2.
+- **security leg**: `parseHtml` scripts-inert is a named facade property landing in
+  S2; CSP story simplifies mechanically in S3 (import()); UMD/global drop and
+  barrel-validation error land in S6.
+- **ux leg**: README/README.ru rewrite + deprecation list consolidated in S6;
+  ua alias EOL copy begins in S1's MIGRATION delta.
+- **create-beads step (bc-mj2)**: the R1 table is directly translatable — 7 slice
+  convoys, deps as listed, allowlist Δ as per-slice done-criteria, TESTS section
+  template (R3) baked into each spec bead.

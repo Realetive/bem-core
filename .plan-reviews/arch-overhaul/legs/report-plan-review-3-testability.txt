@@ -1,0 +1,141 @@
+# Plan-review-3 · testability
+
+Review of `.designs/arch-overhaul/design-doc.md` @ plan-review-2 state (669L), review_id=arch-overhaul, phase=plan-review-3, leg=testability. Repo evidence re-verified read-only @ f2ab61e (branch v5). All corpus citations checked (see Lens 2 verdicts + Confidence).
+
+## Summary
+
+The plan is unusually verifier-dense: the load-bearing architectural claims (allowlist arithmetic 9→∅, CONST-P6 7/12→∅, bundle caps, payload parity, spec corpora, closure greps, CI wiring) each name a mechanical verifier, and every citation I re-checked against the repo is accurate (line counts, hand-list imports, harness sites, standalone inventory, orientchange guard, constitution grep semantics). Decorative verification: none found.
+
+Two must-fix gaps remain, both in the staged-gate machinery the whole series leans on:
+
+1. **The skip/preview guard has no both-modes test.** From S0 to S6 every final assertion (no-jquery-in-artifact, jquery peer/dev removal, CONST-P1 final predicate) runs only in skip mode; its bind path first executes for real at S6's deletion commit. A guard bug that exits 0 forever is indistinguishable from a clean repo — a gate that can be silently skipped, with no named test anywhere.
+2. **The two-directional ratchet has no named artifact and no failure-direction test.** KC 10 asserts "the gate fails … when ALLOW−JQ ≠ ∅", but @ f2ab61e the constitution check is additions-only (`comm -23`), the S0 amendment list in KC 13 names only CONST-P6 + the CONST-P1 final predicate, and no script/section owns the forgotten-shrink comparison. As written, a forgotten shrink surfaces at S6, contradicting KC 10's own claim.
+
+Plus 12 should-fix items: mostly predicate-set definitions the S0 authored checks will need anyway (zero-jquery pattern/exclusions, notices-intact, CONST-P6 include-set, doc-fence anchor syntax/file-set), two audits that are prose rather than greps (CORS, parseHtml), the ua-alias once-warn contract with no test, the Vite half of exports-narrowing, bench gating not covering S2 itself, the S5 harness exit lacking an S5-time predicate, registration-accounting having no home, the page.examples "checked" clause, and the spike's unnamed recording artifact.
+
+None of these require plan restructuring — every fix is a cell/section edit naming an existing verifier or tightening a predicate definition. With MF-1/MF-2 applied, the create-beads conversion can encode every done-gate mechanically.
+
+## Verifier inventory (claim → named verifier → verdict: mechanical / procedural / decorative / missing)
+
+| # | Claim (doc location) | Named verifier | Verdict |
+|---|---|---|---|
+| 1 | Per-slice bundle ≤ gz caps (KC 10, S0 cell) | `specs/bundle-budget.json` + `build/check-bundle-size.mjs`, rides CI `build` job from S0 | **mechanical** (self-test see MF-1) |
+| 2 | Final: no-jquery artifact + jquery peer/dev removal (Exec Summary, KC 10) | gate assertions activate at S6, keyed on wrapper existence + package.json cleanliness | **mechanical** but guard untested → **MF-1** |
+| 3 | CONST-P1 additions ratchet (constitution @ f2ab61e) | sdd-check `comm -23` (re-run @ f2ab61e: exactly the 9 allowlisted files) | **mechanical** — verified |
+| 4 | CONST-P1 forgotten-shrink direction (KC 10 "ALLOW−JQ ≠ ∅") | none named (no script, no amendment slot) | **missing** → **MF-2** |
+| 5 | Per-slice allowlist/baseline state (KC 10, design position 6) | "each slice's done-gate grep pins the exact expected allowlist/baseline contents" | **procedural** (unscripted) — folded into MF-2 fix |
+| 6 | CONST-P6 ancestor-existence, baseline 7 groups/12 files (KC 13) | sdd-check + CI `build` job from S0; baseline re-verified exact under the enumerated kinds (JS/.deps.js/bemhtml/bh; zero standalone CSS) | **mechanical**; include-set gap → **SF-12** |
+| 7 | Pinned public API (design position 2, TESTS S0) | api-pin test + D-6 deleted-path negative tests, join `test` node suite (verified: `npm test` is `node --test`-based) | **mechanical**; Vite side → **SF-5** |
+| 8 | Generated payload parity incl. `keyboard__codes` (KC 8, OQ-6) | payload-parity assertion vs checked-in pre-S0 lists (imports verified: desktop.js:53 / touch.js:52) | **mechanical** |
+| 9 | Generated-entry freshness (KC 8) | CI re-runs generator + diffs committed `*.gen.js` | **mechanical** |
+| 10 | Plugin transformer-form hard error (KC 9) | plugin validation + existing plugin test corpus (verified: `vite-plugin-bem-levels.test.js` exists) | **mechanical** |
+| 11 | `inherit` frozen / `inherit.self` preserved (Exec, KC 8, D-2) | zero code change + `i-bem-dom.spec.js:1813` suite (verified: `describe('modules.define patching')` @ 1813; live-patch semantics exercised there) | **mechanical** — citation accurate |
+| 12 | Spec corpora pinned green (TESTS item 1) | cited paths; all counts verified @ f2ab61e: dom 159L, `__events_type_dom` 1069L, `__events_type_bem` 1013L, `i-bem-dom` 1854L, `loader_type_js.spec.js` exists (33L), idle no corpus (verified: only `_start`/deps/js/md) | **mechanical** — citations accurate |
+| 13 | Shim-map ratchet home (KC 12, OQ-5) | working position plugin-test assertion; decision @ S0 spec-craft, before first Harness Δ entry | decision-point pinned — **acceptable** |
+| 14 | Registration accounting + loose liveness floor (KC 12, Data Model 6) | "per-file registration accounting" — no artifact, no home, no floor value | **vague** → **SF-7** |
+| 15 | Touch emulation incl. serving path (S1 cell, TESTS S1) | touch-emulated Playwright project + second webServer/port or param'd `platform=touch` config (verified: `vite.test.config` hardcodes `platform: 'desktop'`) | **mechanical** |
+| 16 | orientchange firing guard (KC 1) | "pinned by the S1 emulation-parity tests" (heuristic verified @ `touch.blocks/ua/ua.js:78` — landscape AND width) | **mechanical** — named |
+| 17 | UA-derived getter justification (G2, S1 cell) | one dedicated unit per UA-derived getter + spec justification | **mechanical** |
+| 18 | ua alias contract (KC 2, env/ua surface, D-13) | "pinned in the S1 spec" — doc text only, no test named | **procedural** → **SF-4** |
+| 19 | api-pin grows with barrel (S1 cell, TESTS S1) | "+env/+ua, pin test green in the same commit" | **mechanical** |
+| 20 | parseHtml scripts-inert (D-11, S2) | parseHtml policy test (mechanical) + escape-hatch "targeted grep/spec audit" (unnamed) | split: mechanical + **procedural** → **SF-9** |
+| 21 | Bench ratios ≤1.10× (KC 11, S2 cell) | Playwright `--project=bench` B1–B5 vs v5-base baselines recorded into bench config (capture step scheduled S2; same toolchain at tag — verified `git diff 7a9e932..f2ab61e` = constitution+specs only) | **mechanical**; S2 itself ungated → **SF-6** |
+| 22 | Loader semantics (S3 cell, TESTS S3) | promise-return, error-callback, ES-only + cross-origin rejection tests, servable ES-module fixtures | **mechanical** |
+| 23 | "zero cross-origin loader URLs" (S3 cell, F3) | "internal-consumer audit confirms" — no grep, no artifact, no record target | **procedural-unnamed** → **SF-9** |
+| 24 | Loader closure (S3 cell) | zero `loader_type_bundle` refs repo-wide, zero `loader_type_js` refs repo-wide, dynamic `import(` present | **mechanical** |
+| 25 | S4 interop + focus delegation (S4 cell, TESTS S4) | mixed-flow integration test; focus-delegation coverage NEW | **mechanical** |
+| 26 | S5 registry parity (D-3, KC 5, S5 cell) | four named parity tests (positional args, `flags.fns` dedup, `propagationStoppedDomNode`, #1525 skip) | **mechanical** |
+| 27 | S5 harness jquery exit (S5 cell, KC 12, TESTS item 4) | same-commit deletions of the three sites (verified @ f2ab61e: `entry.js:42` import, `:97` shim `jquery: $`, `vite.test.config:44` optimizeDeps); standing detector (final predicate harness conjunct) binds only at S6 | **late** → **SF-1** |
+| 28 | S6 final gates (D-14, S6 cell, TESTS S6) | no-jquery artifact, CONST-P1 ∅, CONST-P6 ∅, notices-intact | mechanical except: zero-jquery pattern undefined (**SF-2**), notices predicate undefined (**SF-3**) |
+| 29 | Doc-parity fence (KC 13, CI wiring, S6 docs pass) | anchor-count check en↔ru per commit, rides `build` job from S0; targets verified to exist (MIGRATION(.ru)/CHANGELOG(.ru)) | **mechanical-ish**; predicate/file-set → **SF-8** |
+| 30 | Block-docs ride slices (TESTS item 5, S1/S2/S3/S6 cells) | Docs Δ checklist carrier; fence extension decided @ S0 spec-craft | **procedural** — bounded, acceptable |
+| 31 | README contributor section bound (S6 cell) | "1-REQ-equivalent bound" — spec-craft REQ accounting | **procedural-mechanical** — acceptable |
+| 32 | S0 spike retires S3 bundler unknown (S0 cell, F9) | "recording Vite 8/rolldown behavior" — no named artifact/record home | **vague** → **SF-11** |
+| 33 | Revert safety (Risks row, Implementation Plan) | "gates re-key off git-tracked state" — verified: every guard input (CONSTITUTION.md allowlist, wrapper dirs, package.json, baselines, budgets) is git-tracked; no untracked keying found | **mechanical** — verified OK |
+| 34 | "page.examples relics checked" (S6 cell) | none — "checked" with no predicate/disposition (verified: standalone fixtures exist, e.g. `40-es5-shims.bemjson.js`) | **missing** → **SF-10** |
+
+Lens statements:
+- **Lens 1 (acceptance criteria):** every "Shippable outcome" clause walked; outcome prose without a done-gate/TESTS carrier found in four places (rows 5, 14, 23, 34 → MF-2/SF-7/SF-9/SF-10). The "decide at spec-craft" clauses (idle corpus, bada/wp, capped artifacts, fence extension) all carry named decision points with owners/timing — the plan's own deferral mechanism, not findings.
+- **Lens 2 (missing tests):** the specifically load-bearing test list from the brief is covered by name (S5 four parity tests, S4 interop/focus, S1 emulation+units, S0 pin/negatives/parity/plugin/freshness, S2 parseHtml+B1–B5+capture, S3 rejections+closure, S6 final gates, orientchange guard via emulation parity, keyboard__codes via payload parity, `inherit.self` via `:1813`). Genuinely missing/unowned: guard both-modes test (MF-1), ratchet direction-2 (MF-2), alias once-warn (SF-4), Vite narrowing (SF-5). All corpus citations re-verified accurate @ f2ab61e.
+- **Lens 3 (vague verification):** graded every audit/confirm/check/green/pinned/fenced/assertion/grep occurrence; zero decorative. Vague-but-fixable: SF-2, SF-3, SF-7, SF-8, SF-9, SF-11, SF-12. Thresholds all have measurement procedures (bench ratios name baseline source + capture step; bundle caps name spec JSON + script + amendment timing).
+- **Lens 4 (phase gates):** skip/preview guard untested in bind mode (MF-1); direction-2 unowned (MF-2); git-tracked keying verified clean (row 33); preview-exit-0-forever = MF-1's failure mode; S0a/S0b and S6a/S6b splits do not disturb gate staging (deletion commit lands in S6a, so first binding-green stays at the S6a deletion commit — consistent with KC 10/KC 13); done-gate command line is mechanical and runs constitution sdd-checks per the CONSTITUTION header.
+
+## Findings ([must-fix] / [should-fix], each with section anchor + suggested fix)
+
+### MUST-FIX
+
+**MF-1 — Skip/preview guard has no test proving it can bind or go red.**
+Sections: Key Components 10 ("Guard form: the final assertions short-circuit to preview output + exit 0 while (allowlist ≠ ∅) OR the wrapper block still exists OR package.json still lists jquery, binding otherwise"), Key Components 13 (same guard for the CONST-P1 final predicate), Executive Summary staged-gate bullet, CI wiring ("CONST-P1 final predicate (in its skip/preview form) ride the same `build` job from S0"). Slices: S0 (authoring), S6 (first real bind).
+From S0 through S5 the guard runs only in skip mode; the bind branch first executes with real state at S6's deletion commit. A guard bug (wrong file key, inverted disjunct, path typo) yields exit-0-forever — the final assertions silently never run — and a green at S6 cannot distinguish "clean repo" from "broken guard". The assignment's own litmus: a gate that has never failed is unverified; this one cannot fail before S6 by construction, so only a fixture test can verify it. No TESTS item names one.
+Suggested fix: TESTS item 2 (S0 "New") gains a guard meta-test: the gate scripts are exercised against three fixture trees — skip-state (exit 0 + preview output), bind-state-clean (exit 0 + binding output), bind-state-dirty (one planted jquery import/artifact byte → exit 1). Add one sentence to KC 10 and KC 13: "the guard's skip/bind/red paths are covered by the S0 meta-test fixture (three repo states), so the bind branch is proven before S6." Apply the same pattern to `check-bundle-size.mjs` (fixture artifact over cap → exit 1) and the doc fence.
+
+**MF-2 — Two-directional ratchet: no named artifact implements ALLOW−JQ, no test can fire it.**
+Sections: Key Components 10 ("the ratchets are two-directional: the gate fails not only on a new jquery consumer/standalone (additions) but also when an allowlist/baseline entry's file no longer matches reality (ALLOW−JQ ≠ ∅ — forgotten shrinks surface in the slice that migrated the consumer, not at S6)"), Key Components 13 (S0 amendment list names only "the new CONST-P6 clause and the CONST-P1 final predicate"), TESTS item 4/Implementation Plan done-gate line. Slices: S0 (amendment), S1–S5 (per-slice deltas).
+Verified: the constitution check @ f2ab61e is `comm -23` additions-only; `check-bundle-size.mjs` is byte-caps; no section names the artifact that compares ALLOW−JQ / baseline−actual. The per-slice "done-gate grep pins the exact expected contents" is prose unless the pin is a script; and between done-gates nothing standing catches a shrink that lands without its allowlist edit (e.g., a stray mid-slice commit migrating a consumer). As written, KC 10's claim ("surface in the slice that migrated the consumer") is unverifiable — direction-2 has no owner, which is precisely the forgotten-shrink blindness SQ-SF-6 was filed against.
+Suggested fix: (a) KC 13's S0 amendment list gains "CONST-P1 sdd-check amended to bidirectional (`comm` in both directions) and the CONST-P6 check authored with its baseline file as the comparison substrate" — the ratchet direction claim then lives in a named, runnable artifact riding spec-craft + done-gate + CI from S0. (b) TESTS item 2 (S0) gains the direction-2 red test: fixture with an allowlist entry whose file no longer matches reality → exit 1 (mirrors MF-1's fixture). (c) Implementation Plan done-gate line reworded: "the slice's grep predicates" → "the slice's scripted allowlist/baseline pin (expected contents embedded in the slice spec's sdd-check)".
+
+### SHOULD-FIX
+
+**SF-1 — S5 harness jquery exit is mechanically detected only at S6.**
+Sections: S5 outcome cell ("the shim-map `jquery` entry, `entry.js`'s `import $ from 'jquery'`, and the `vite.test.config` `optimizeDeps` jquery line deleted in the same commit"), KC 12, TESTS item 4. Slices: S5, S6.
+F1's rationale was "must not be discovered mid-S6", but the standing detector (final predicate's sources+harness conjunct) binds at S6; at S5 the exit is verified by review only. The three sites are enumerable (verified @ f2ab61e).
+Suggested fix: TESTS item 4 S5 entry gains a closure grep at S5's own done-gate: zero `jquery` references across `test/browser/entry.js`, the shim map, and `build/vite.test.config.js` (pattern per SF-2).
+
+**SF-2 — "zero jquery imports repo-wide" predicate: pattern and exclusions undefined.**
+Sections: Key Components 13 ("deps manifests ∅, sources+harness+build-configs ∅ — zero jquery imports repo-wide"), Executive Summary bullet, S6 cell. Slices: S0 (authoring), S6 (binding).
+MIGRATION/CHANGELOG/README prose legitimately contains "jquery" (verified the files exist and will accumulate jquery-named entries); a naive grep reds on docs. The S0-authored sdd-check needs the semantics pinned now.
+Suggested fix: KC 13 names the predicate shape: import-form patterns only (`from 'jquery'`, `import 'jquery'`, `require('jquery')`, deps.js `'jquery'` string entries, shim-map keys, optimizeDeps entries), include set = sources + `test/` + `build/` configs, exclude set = `*.md`, `.git`, `node_modules`, `dist`.
+
+**SF-3 — notices-intact grep undefined.**
+Sections: Key Components 13 ("CONST-P5: LICENSE.txt + file-level MPL-2.0 notices preserved … S6 done-gate includes a notices-intact grep"), S6 cell, TESTS item 2 S6. Slices: S0 (baseline), S6.
+The existing CONST-P5 sdd-check is only `test -f LICENSE.txt`. "File-level notices preserved through deletions and rewrites" needs a baseline to compare against, else the grep cannot fail meaningfully.
+Suggested fix: TESTS item 2 S6 names the predicate: S0 records the notice-bearing file list (or count) as a checked-in baseline; the S6 done-gate asserts every surviving baseline file still carries its notice (`grep -L 'MPL'` over the list = ∅) + `LICENSE.txt` exists.
+
+**SF-4 — ua alias once-warn contract has no test.**
+Sections: Key Components 2 ("removed fields warn once per field and return `undefined`; assignments warn once and no-op"), env / ua surface ("destructuring/spread snapshots are unsupported by design (noted in the S1 spec…)"), D-13. Slices: S1.
+TESTS S1 names env units, emulation parity, api-pin update — no alias units. Once-warn/undefined/no-op is observable public behavior and the designed failure mode of the deprecation; untested, S5's "dies with the alias" has no green baseline to die from.
+Suggested fix: TESTS item 2 S1 gains "ua alias units: removed-field once-per-field warn (spy) + `undefined` return; assignment once-warn no-op; live property-read forwarding (alias tracks env getter changes)".
+
+**SF-5 — exports-narrowing claim covers Vite; the test covers Node.**
+Sections: Design position 2 ("`ERR_PACKAGE_PATH_NOT_EXPORTED` / Vite build-time"), Misuse error experience (same), D-6 ("deleted-path negative tests land pre-narrowed"), TESTS item 2 S0, CI wiring ("api-pin joins the `test` node suite"). Slices: S0.
+The api-pin negative tests join the Node suite; no named test asserts the Vite-side "unresolved import, early and greppable" half. The S0 spike runs dynamic import through the dev-server + lib build (adjacent, but asserts generation, not narrowing). Also D-6's "land pre-narrowed" is ambiguous (assert-today-green then flip, or land asserting rejection with the narrowing commit).
+Suggested fix: TESTS item 2 S0 pins the Vite half: the spike REQ additionally asserts one narrowed deep-import fails to resolve through the dev-server test config (or record Node-only scope as the deliberate bound); D-6 line clarified to "deleted-path negative tests written against the pre-narrowing behavior, their expectations flipped in the narrowing commit, so the commit's diff enumerates the break".
+
+**SF-6 — bench ratio gate does not cover S2 itself.**
+Sections: Key Components 11 ("the done-gate for S4/S5"), S2 outcome cell ("bench project B1–B5 on ratio thresholds + v5-base reference capture"). Slices: S2.
+S2 rewrites dom/idle/winresize (paths B1 init / B4 live-collection measure) and lands the baselines in-slice; if gating starts at S4, an S2-caused regression first reds at S4's gate — late and mis-attributed. S3 is legitimately exempt (no scenario touches the loader).
+Suggested fix: KC 11 + S2 cell: ratios gate every slice's done-gate from S2 onward (baselines captured in-slice; the gate's first firing is S2's own done-gate).
+
+**SF-7 — registration accounting has no home, floor, or owner.**
+Sections: Key Components 12 ("magic `>400` floor replaced by per-file registration accounting + loose liveness floor"), Data Model 6, Risks row ("Registration accounting + loose floor … per-slice ratchet"). Slices: S0–S5 (harness).
+What is counted, where the per-file expectation lives, who updates it, and what "loose floor" means are all unnamed. This is the same class as the shim-map home, which got OQ-5 with a working position + decision point; registration accounting got neither.
+Suggested fix: extend OQ-5 (or add OQ-11): decision at S0 spec-craft — ledger home (working position: checked-in JSON keyed by spec path, shrinking ratchet, asserted by the plugin-test home chosen for the shim map), definition of "loose liveness floor" (e.g., total registered ≥ N% of ledger), update owner (the slice performing the Harness Δ).
+
+**SF-8 — doc-parity fence: anchor syntax and file-set per phase undefined.**
+Sections: Key Components 13 ("Doc-parity fence (MIGRATION/CHANGELOG en↔ru section anchors) in S0"), CI wiring ("the doc-parity fence rides the same `build` job from S0"), S6 cell/docs row ("ru/en anchor parity via the doc fence"). Slices: S0, S6.
+"Anchor-count check" needs: which heading levels count, and which files — at S0 it is MIGRATION/CHANGELOG pairs, but the S6 docs pass leans on "the doc fence" for common.docs parity without saying common.docs joins the fence's file-set. If it never joins, the S6 docs-pass parity clause has no verifier.
+Suggested fix: KC 13 fence sentence extended: anchor = `^#{2,3} ` headings; file-set S0 = MIGRATION(.ru)/CHANGELOG(.ru); S6 = fence extended to the touched common.docs guides (enumerated in S6's spec), each en/ru pair anchor-count-equal.
+
+**SF-9 — Two audits are prose, not predicates: CORS (S3) and parseHtml escape hatch (S2).**
+Sections: S3 outcome cell ("audit confirms zero cross-origin loader URLs"), Loader surface semantics table cross-origin row, D-11 escape hatch ("S2 must run the targeted grep/spec audit; if a dependent exists, revert to parity"). Slices: S2, S3.
+Neither audit names its grep set, its record target, or its failure action record. Both justify documented behavior breaks; a wrong audit ships silent behavior change to in-repo consumers.
+Suggested fix: S2 cell: parseHtml audit = named grep (script-execution dependents of `parseHtml`/`dom.parse` across sources+specs, pattern listed in the S2 spec) + result quoted in the spec (go/no-go on D-11 escape hatch). S3 cell: CORS audit = named grep (zero `https?://` literals in loader call sites + spec fixtures) + result quoted in the S3 spec notes and referenced from the MIGRATION line.
+
+**SF-10 — "page.examples relics checked" has no predicate or disposition.**
+Sections: S6 outcome cell ("`page.examples` relics checked"). Slices: S6.
+Verified: standalone example/tmpl-spec fixtures exist (`40-es5-shims.bemjson.js`, tmpl-specs 50/60/70, touch `70-zoom`). "Checked" names neither what happens if a relic references the deleted elem nor the closure condition.
+Suggested fix: S6 cell: "relics dispositioned: any example/tmpl-spec referencing `conditional-comment` deleted (named in the MIGRATION entry); others keep-listed with a one-line reason; done-gate grep: zero `conditional-comment` references outside MIGRATION/CHANGELOG text."
+
+**SF-11 — S0 spike result has no named artifact.**
+Sections: S0 outcome cell ("timeboxed spike REQ — dynamic `import(variable)` … recording Vite 8/rolldown behavior (retires S3's bundler unknown…)"). Slices: S0, S3.
+The recording that retires S3's only unknown must be re-findable at S3 spec-craft; "recording" names no home.
+Suggested fix: S0 cell: spike result lands in the S0 spec's decision record (a dated section) and is cited by the S3 spec; the spike's smoke-test assertion (generated entry resolves through both build paths) joins TESTS S0.
+
+**SF-12 — CONST-P6 include-set must explicitly exclude bemjson fixtures.**
+Sections: Key Components 13 ("every file in a platform level — JS, `.deps.js`, bemhtml/bh templates, CSS — must have a `common.blocks` ancestor"). Slices: S0.
+Verified: besides the enumerated 7 groups/12 files, five standalone `.bemjson.js` fixtures exist (`page.examples/40-es5-shims`, desktop tmpl-specs 50/60/70, touch `70-zoom`). The kind enumeration implies they are out of scope, but an S0-authored check sweeping "every file" without the extension allow-list reds at S0 with a 17-file baseline.
+Suggested fix: KC 13 names the include-set mechanically: extensions `{.js, .deps.js, .bemhtml.js, .bh.js, .css}` under `desktop.blocks/`/`touch.blocks/`, explicitly excluding `*.bemjson.js` fixtures and `*.examples/` (or: fixtures counted in the baseline deliberately — either way, encode it).
+
+## Confidence
+
+High. Every repo citation was re-verified @ f2ab61e in this session (line counts, `:1813`, keyboard__codes imports, harness/config sites, allowlist contents and `comm -23` semantics, standalone inventory incl. the fixture sharp edge, orientchange guard, CI jobs/matrix, script targets, MIGRATION/CHANGELOG existence). The two must-fix gradings rest on absence-of-named-verifier within the doc — checked against all five round logs to confirm none of them already carries these verifiers (they do not; MF-1/MF-2 are the residual gaps after SQ-SF-6 and C-F1's fixes). Should-fix severity is judgment; all are cheap design-doc edits that the S0 spec-craft would otherwise have to invent under pressure. Lens coverage: all four lenses walked to exhaustion; no decorative verification found; outcome clauses without carriers are exactly MF-2/SF-7/SF-9/SF-10.
