@@ -3,7 +3,6 @@ modules.define('spec', [
     'i-bem-dom',
     'objects',
     'events',
-    'jquery',
     'chai',
     'sinon',
     'BEMHTML'
@@ -12,7 +11,6 @@ modules.define('spec', [
     bemDom,
     objects,
     events,
-    $,
     chai,
     sinon,
     BEMHTML

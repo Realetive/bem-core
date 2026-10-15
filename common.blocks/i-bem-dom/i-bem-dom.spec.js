@@ -4,7 +4,6 @@ modules.define('spec', [
     'i-bem-dom__collection',
     'objects',
     'functions',
-    'jquery',
     'chai',
     'sinon',
     'BEMHTML'
@@ -14,7 +13,6 @@ modules.define('spec', [
     BemDomCollection,
     objects,
     functions,
-    $,
     chai,
     sinon,
     BEMHTML
@@ -1499,7 +1497,7 @@ describe('i-bem-dom', function() {
         });
 
         it('should allow to pass simple string', function() {
-            var domElem = $('<div/>');
+            var domElem = bemDom.init('<div></div>');
             bemDom.update(domElem, 'simple string');
             domElem.html().should.be.equal('simple string');
         });

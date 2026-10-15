@@ -55,6 +55,6 @@ export default defineConfig({
     },
 
     optimizeDeps: {
-        include: ['chai', 'sinon', 'sinon-chai', 'jquery'],
+        include: ['chai', 'sinon', 'sinon-chai'],
     },
 });

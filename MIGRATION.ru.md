@@ -1678,6 +1678,26 @@ B4 живая коллекция, B5 деструкт без утечек (heap 
 
 BEM-события (`_events()`) остаются на jQuery-транспорте до S5.
 
+### S5 BEM-события + плагин: чистый реестр; выход из jquery
+
+**BEM-события на реестре**: `_emit()` больше не проходит через
+jQuery-события (`$.event.special` + `domElem.trigger`). Их заменил реестр
+биндингов по имени сущности с обходом цепочки вложенности; семантика `this`
+и `e.bemTarget` сохранена (owner-инстанс для instance-биндингов, ближайший
+owner для class-биндингов).
+
+**`domElem` — нативная коллекция**: `entity.domElem` больше не
+jQuery-коллекция, а массиво-подобная `DomCollection`
+(`bem:i-bem-dom__dom`) с `[0]`, `.length` и jQuery-образными методами
+обхода/манипуляции (`find`, `filter`, `children`, `parent(s)`, `appendTo`,
+`addClass`, `html`, `is`, `not`, `eq`, `get`, `each`, …). `$.fn.bem` удалён —
+используйте `bemDom.initOnDom(node, Entity)` / `bemDom.getFromDom(node, Entity)`.
+`bemDom.init` возвращает `DomCollection`; `bemDom.scope`/`doc`/`win` —
+нативные коллекции.
+
+**`i-bem-dom__init_auto` нативен**: DOMContentLoaded/readyState вместо
+jQuery-ready. Тестовый harness больше не поставляет jQuery.
+
 **Корневой экспорт стал barrel-модулем именованных экспортов.** Корень пакета `.` раньше разрешался в side-effect-пейлоад десктопа (`import 'bem-core'` импортировал всю библиотеку и автоматически её инициализировал). Теперь он разрешается в платформенно-нейтральный barrel `dist/index.mjs` с именованными экспортами (никогда не инициализирует автоматически):
 
 ```js

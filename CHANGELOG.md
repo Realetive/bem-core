@@ -15,6 +15,8 @@
 - **`idle` is native (S2)**: user-action monitoring uses native document listeners; the block no longer depends on jQuery (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
 - **`jquery__event_type_winresize` deleted (S2)**: the IE8-only resize special-event guard is dead code on evergreen targets; the desktop payload drops it (see MIGRATION → "S2 Periphery: dom/idle native, winresize deleted").
 - **Dom events are native (S4)**: `_domEvents()` runs on a per-scope native delegation engine — one listener per node and type, an inclusive `composedPath()` walk with compile-once single-class matchers, focus/blur → focusin/focusout mapping; handlers receive the native event (see MIGRATION → "S4 Events core: native delegation engine").
+- **BEM events are registry-based (S5)**: `_emit()` runs on a pure per-entity-name binding registry with a containment-chain walk (no `$.event.special`); handler `this`/`e.bemTarget` parity preserved (see MIGRATION → "S5 BEM events + plugin: pure registry; jquery exit").
+- **`domElem` is a native collection (S5)**: `entity.domElem` is now an array-like `DomCollection`, not a jQuery collection; `$.fn.bem` is removed in favor of `bemDom.initOnDom`/`getFromDom` (see MIGRATION → "S5 BEM events + plugin: pure registry; jquery exit").
 
 ### Features
 
@@ -32,6 +34,7 @@
 - Old benchmark relics (`benchmarks.blocks` b1/b2/page, `benchmarks.bemjson.js`) deleted — superseded by the bench project.
 - `events_type_dom.spec.js` (1069L) converted off the jquery shim to native dispatch (harness-exit carrier 2/3); NEW focus/blur delegation coverage (focusin/focusout mapping) and a dom/bem mixed-flow interop test.
 - `i-bem-dom__events` base is jQuery-free (type-specific attach seams; bem-type keeps the interim jQuery transport until S5).
+- i-bem-dom is jQuery-free (S5): native `DomCollection` (`bem:i-bem-dom__dom`) replaces the jQuery domElem; `__init_auto` is native; the test harness no longer ships jQuery (entry shim + optimizeDeps jquery removed); `i-bem-dom.spec.js` + `events_type_bem.spec.js` drop their jquery deps.
 
 
 ## 5.0.0

@@ -1656,6 +1656,26 @@ a focus/blur → focusin/focusout mapping replace it. Visible changes:
 
 BEM events (`_events()`) still ride the jQuery transport until S5.
 
+### S5 BEM events + plugin: pure registry; jquery exit
+
+**BEM events are registry-based**: `_emit()` no longer routes through jQuery
+custom events (`$.event.special` + `domElem.trigger`). A per-entity-name
+binding registry with a containment-chain walk replaces it; handler `this`
+and `e.bemTarget` semantics are preserved (owner instance for instance
+bindings, closest owner for class-level bindings).
+
+**`domElem` is a native collection**: `entity.domElem` is no longer a jQuery
+collection — it is an array-like `DomCollection` (`bem:i-bem-dom__dom`) with
+`[0]`, `.length`, and the jQuery-shaped traversal/manipulation methods
+(`find`, `filter`, `children`, `parent(s)`, `appendTo`, `addClass`, `html`,
+`is`, `not`, `eq`, `get`, `each`, …). `$.fn.bem` is gone — use
+`bemDom.initOnDom(node, Entity)` / `bemDom.getFromDom(node, Entity)`.
+`bemDom.init` returns a `DomCollection`; `bemDom.scope`/`doc`/`win` are native
+collections.
+
+**`i-bem-dom__init_auto` is native**: DOMContentLoaded/readyState instead of
+the jQuery ready handler. The test harness no longer ships jQuery.
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js

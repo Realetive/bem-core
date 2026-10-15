@@ -39,7 +39,6 @@ import stringsEscape from 'bem:strings__escape';
 import events from 'bem:events';
 import eventsObservable from 'bem:events__observable';
 
-import $ from 'jquery';
 import 'bem:jquery__config';
 
 import dom from 'bem:dom';
@@ -101,7 +100,6 @@ window.modules = createModulesShim({
     env,
     ua: uaAlias,
     'ua__dom': uaDom,
-    jquery: $,
     chai,
     sinon,
     'sinon-chai': sinonChaiPlugin,

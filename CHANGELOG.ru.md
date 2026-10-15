@@ -15,6 +15,8 @@
 - **`idle` нативен (S2)**: мониторинг действий пользователя на нативных слушателях document; блок больше не зависит от jQuery (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
 - **`jquery__event_type_winresize` удалён (S2)**: guard resize для IE8 — мёртвый код на evergreen-целях; десктопный пейлоад его теряет (см. MIGRATION → «S2 Периферия: нативные dom/idle, winresize удалён»).
 - **Dom-события нативны (S4)**: `_domEvents()` работает на нативном движке делегирования по скоупам — по слушателю на узел и тип, инклюзивный обход `composedPath()` с компилируемыми один раз матчерами одиночных классов, маппинг focus/blur → focusin/focusout; хендлеры получают нативное событие (см. MIGRATION → «S4 Ядро событий: нативный движок делегирования»).
+- **BEM-события на реестре (S5)**: `_emit()` работает на чистом реестре биндингов по имени сущности с обходом цепочки вложенности (без `$.event.special`); паритет `this`/`e.bemTarget` сохранён (см. MIGRATION → «S5 BEM-события + плагин: чистый реестр; выход из jquery»).
+- **`domElem` — нативная коллекция (S5)**: `entity.domElem` теперь массиво-подобная `DomCollection`, а не jQuery-коллекция; `$.fn.bem` удалён в пользу `bemDom.initOnDom`/`getFromDom` (см. MIGRATION → «S5 BEM-события + плагин: чистый реестр; выход из jquery»).
 
 ### Возможности
 
@@ -32,6 +34,7 @@
 - Старые бенчмарк-реликты (`benchmarks.blocks` b1/b2/page, `benchmarks.bemjson.js`) удалены — заменены бенч-проектом.
 - `events_type_dom.spec.js` (1069L) конвертирована с jquery-шима на нативную диспетчеризацию (harness-exit носитель 2/3); НОВОЕ покрытие делегирования focus/blur (маппинг focusin/focusout) и mixed-flow интероп-тест dom/bem.
 - База `i-bem-dom__events` без jQuery (типоспецифичные швы прикрепления; bem-тип сохраняет временный jQuery-транспорт до S5).
+- i-bem-dom без jQuery (S5): нативная `DomCollection` (`bem:i-bem-dom__dom`) вместо jQuery-domElem; `__init_auto` нативен; тестовый harness больше не поставляет jQuery (убраны shim-entry + optimizeDeps jquery); `i-bem-dom.spec.js` и `events_type_bem.spec.js` сняли jquery-зависимости.
 
 
 ## 5.0.0
