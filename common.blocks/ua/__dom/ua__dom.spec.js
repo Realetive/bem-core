@@ -93,15 +93,13 @@ describe('ua__dom', function() {
         block.getMod('svg').should.be.equal(env.svg? 'yes' : 'no');
     });
 
-    it('sets orient mod at init (touch delta; skipped where delta absent)', function() {
+    it('sets orient mod at init', function() {
         var block = initBlock();
-        if(block.getMod('orient') === '') return this.skip();
         block.getMod('orient').should.be.equal(env.landscape? 'landscape' : 'portrait');
     });
 
-    it('updates orient mod on native orientchange (touch delta; skipped where delta absent)', function() {
+    it('updates orient mod on native orientchange', function() {
         var block = initBlock();
-        if(block.getMod('orient') === '') return this.skip();
 
         window.dispatchEvent(new CustomEvent('orientchange', {
             detail : { landscape : true, width : 667, height : 375 }

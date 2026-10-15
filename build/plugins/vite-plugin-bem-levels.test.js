@@ -165,15 +165,6 @@ describe('parseModulesDefine (real file cross-check)', function() {
         assert.ok(source.includes('export default'), 'should have export default');
     });
 
-    it('real file: ua__dom touch is now ESM (migrated)', function() {
-        const source = readFileSync(
-            resolve(ROOT, 'touch.blocks/ua/__dom/ua__dom.js'), 'utf8'
-        );
-        const result = parseModulesDefine(source);
-        assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
-        assert.ok(source.includes('export default'), 'should have export default');
-    });
-
     it('real file: dom facade is ESM with default export', function() {
         const source = readFileSync(
             resolve(ROOT, 'common.blocks/dom/__facade/dom__facade.js'), 'utf8'
@@ -214,10 +205,9 @@ describe('scanLevel', function() {
         assert.ok(!modules.has('ua'), 'ua desktop fork deleted (S1: bem:ua resolves to common alias)');
     });
 
-    it('scans touch.blocks', function() {
+    it('scans touch.blocks (empty after S6 collapse)', function() {
         const modules = scanLevel(resolve(ROOT, 'touch.blocks'));
-        assert.ok(modules.has('ua__dom'), 'Should find ua__dom touch delta');
-        assert.ok(!modules.has('ua'), 'ua touch fork deleted (S1: bem:ua resolves to common alias)');
+        assert.strictEqual(modules.size, 0, 'touch.blocks is empty at S6');
     });
 
     it('returns empty map for non-existent directory', function() {
@@ -262,13 +252,9 @@ describe('buildRegistry', function() {
         assert.ok(reg.modules.has('ua__dom'), 'ua__dom is a separate module');
     });
 
-    it('detects ua__dom cross-level redefinition on touch', function() {
+    it('detects no cross-level redefinitions after S6 collapse', function() {
         const reg = buildRegistry(['common.blocks', 'touch.blocks'], ROOT);
-        assert.ok(reg.redefinitions.has('ua__dom'), 'ua__dom should have redefinitions');
-        const entries = reg.redefinitions.get('ua__dom');
-        assert.strictEqual(entries.length, 2);
-        assert.ok(entries[0].filePath.includes('common.blocks'));
-        assert.ok(entries[1].filePath.includes('touch.blocks'));
+        assert.strictEqual(reg.redefinitions.size, 0, 'no cross-level redefinitions remain');
     });
 
     it('events__observable has no cross-level redefinition (type_bem-dom is separate module)', function() {
@@ -409,7 +395,7 @@ describe('parseDepsFile', function() {
 
     it('parses mustDeps', function() {
         const result = parseDepsFile(
-            resolve(ROOT, 'touch.blocks/ua/__dom/ua__dom.deps.js')
+            resolve(ROOT, 'common.blocks/ua/__svg/ua__svg.deps.js')
         );
         assert.ok(result);
         assert.ok(result.mustDeps.length > 0);

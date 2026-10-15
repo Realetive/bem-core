@@ -36,6 +36,11 @@ export default bemDom.declBlock('ua', {
 
                 this.setMod('screen-size', env.screenSize);
                 this.setMod('svg', env.svg ? 'yes' : 'no');
+                this.setMod('orient', env.landscape ? 'landscape' : 'portrait');
+
+                this._domEvents(bemDom.win).on('orientchange', (e) => {
+                    this.setMod('orient', e.detail.landscape ? 'landscape' : 'portrait');
+                });
             }
         }
     }

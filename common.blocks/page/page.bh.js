@@ -1,63 +1,28 @@
 module.exports = function(bh) {
-
     bh.match('page', function(ctx, json) {
         ctx
-            .tag('body')
-            .tParam('nonceCsp', json.nonce)
-            .content([
-                ctx.content(),
-                json.scripts
-            ], true);
-
-        return [
-            { html : json.doctype || '<!DOCTYPE html>', tag : false },
-            {
-                tag : 'html',
-                attrs : { lang : json.lang },
-                cls : 'ua_js_no',
-                content : [
-                    {
-                        elem : 'head',
-                        content : [
-                            { tag : 'meta', attrs : { charset : 'utf-8' } },
-                            json.uaCompatible === false? '' : {
-                                tag : 'meta',
-                                attrs : {
-                                    'http-equiv' : 'X-UA-Compatible',
-                                    content : json.uaCompatible || 'IE=edge'
-                                }
-                            },
-                            { tag : 'title', content : json.title },
-                            { block : 'ua',  attrs : { nonce : json.nonce } },
-                            json.head,
-                            json.styles,
-                            json.favicon? { elem : 'favicon', url : json.favicon } : '',
-                        ]
-                    },
-                    json
-                ]
-            }
-        ];
+            .mix({ block : 'ua', js : true })
+            .tParam('zoom', json.zoom);
     });
 
-    bh.match('page__head', function(ctx) {
-        ctx.bem(false).tag('head');
-    });
-
-    bh.match('page__meta', function(ctx) {
-        ctx.bem(false).tag('meta');
-    });
-
-    bh.match('page__link', function(ctx) {
-        ctx.bem(false).tag('link');
-    });
-
-    bh.match('page__favicon', function(ctx, json) {
+    bh.match('page__head', function(ctx, json) {
         ctx
-            .bem(false)
-            .tag('link')
-            .attr('rel', 'shortcut icon')
-            .attr('href', json.url);
+            .applyBase()
+            .content([
+                json.content,
+                {
+                    elem : 'meta',
+                    attrs : {
+                        name : 'viewport',
+                        content : 'width=device-width,' +
+                            (ctx.tParam('zoom')?
+                                'initial-scale=1' :
+                                'maximum-scale=1,initial-scale=1,user-scalable=no')
+                    }
+                },
+                { elem : 'meta', attrs : { name : 'format-detection', content : 'telephone=no' } },
+                { elem : 'link', attrs : { name : 'apple-mobile-web-app-capable', content : 'yes' } }
+            ], true);
     });
 
 };
