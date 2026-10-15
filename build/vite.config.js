@@ -26,21 +26,13 @@ export default defineConfig(({ mode }) => {
             lib: {
                 entry: resolve(import.meta.dirname, 'platforms', `${platform}.gen.js`),
                 name: 'bemCore',
-                formats: ['es', 'umd'],
-                fileName: (format) => `bem-core.${format === 'es' ? 'mjs' : 'js'}`,
+                formats: ['es'],
+                fileName: (format) => `bem-core.mjs`,
             },
             outDir: resolve(rootDir, 'dist', platform),
             emptyOutDir: true,
             sourcemap: true,
             minify: mode === 'production',
-            rolldownOptions: {
-                external: ['jquery'],
-                output: {
-                    globals: {
-                        jquery: 'jQuery',
-                    },
-                },
-            },
         },
 
         server: {

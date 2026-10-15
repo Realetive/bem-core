@@ -105,6 +105,24 @@ If you are upgrading from v4, see [MIGRATION.md](MIGRATION.md).
 
 Please refer to [How to contribute](/CONTRIBUTING.md) guide.
 
+### Platform levels are override-only
+
+The `desktop.blocks/` and `touch.blocks/` levels may only override or refine
+`common.blocks/` — shared behaviour lives in common. A platform override must
+be transformer-form and receive the common base:
+
+```js
+// touch.blocks/example/example.js
+export default function(prev) {
+    return prev; // refine `prev` (the common base) or return a new value
+}
+```
+
+The build hard-errors if a platform file has no common ancestor at the same
+relative path or is not transformer-form, naming both files. Any platform file
+must therefore be a deliberate override of a common module — adding a
+standalone platform file reddens the CONST-P6 baseline check in CI.
+
 ## Supported browsers
 
   - Google Chrome (latest)

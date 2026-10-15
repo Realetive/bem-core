@@ -33,8 +33,6 @@ export default defineConfig(({ mode }) => ({
         emptyOutDir: false,
         sourcemap: true,
         minify: mode === 'production',
-        rolldownOptions: {
-            external: ['jquery'],
-        },
+
     },
 }));

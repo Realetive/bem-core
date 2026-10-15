@@ -1698,6 +1698,24 @@ jQuery-коллекция, а массиво-подобная `DomCollection`
 **`i-bem-dom__init_auto` нативен**: DOMContentLoaded/readyState вместо
 jQuery-ready. Тестовый harness больше не поставляет jQuery.
 
+### S6 Платформа + удаление wrapper: jquery ушёл, платформенные уровни override-only
+
+**jQuery удалён**: блок-обёртка `jquery` (`common.blocks/jquery/` +
+`desktop.blocks/jquery/`) удалён; jquery больше не peer/dev-зависимость.
+Пакет больше не поставляет jQuery.
+
+**UMD-формат dist удалён**: остаётся только ES-модульный пейлоад
+(`dist/desktop/bem-core.mjs`, `dist/touch/bem-core.mjs`). UMD-сборка и её
+глобальная jQuery-зависимость удалены.
+
+**Платформенные уровни override-only (CONST-P6 ∅)**: каждый платформенный
+файл удалён или перенесён в common — `page__conditional-comment` (только IE)
+удалён, `page__icon` перенесён в `common.blocks/page/__icon/`, шаблоны
+`page`/`ua` схлопнуты в common (touch-рендеринг заменяет IE-эру десктопа:
+viewport/zoom meta + apple-mobile-web-app; обработка `doctype`/
+`X-UA-Compatible`/`ua_js_no`/`scripts`/`favicon` удалена). Мод `orient` блока
+`ua` теперь общий (touch-дельта `ua__dom` влита в базу).
+
 **Корневой экспорт стал barrel-модулем именованных экспортов.** Корень пакета `.` раньше разрешался в side-effect-пейлоад десктопа (`import 'bem-core'` импортировал всю библиотеку и автоматически её инициализировал). Теперь он разрешается в платформенно-нейтральный barrel `dist/index.mjs` с именованными экспортами (никогда не инициализирует автоматически):
 
 ```js

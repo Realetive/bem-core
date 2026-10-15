@@ -277,39 +277,6 @@ function normalizeDep(dep) {
  * This is a simplified conversion — real BEM naming is more complex,
  * but for the modules actually defined in bem-core, this covers all cases.
  */
-function bemEntityToModuleName(entity, contextBlock) {
-    if (typeof entity === 'string') return entity
-    const block = entity.block || contextBlock
-    if (!block) return null
-    let name = block
-    // Handle elem / elems
-    if (entity.elem) {
-        name += '__' + entity.elem
-    }
-
-    // Handle mod / mods
-    if (entity.mod) {
-        name += '_' + entity.mod
-        if (entity.val && entity.val !== true) {
-            name += '_' + entity.val
-        }
-    }
-    if (entity.mods) {
-        for (const [mod, vals] of Object.entries(entity.mods)) {
-            if (Array.isArray(vals)) {
-                // Multiple values → multiple modules (e.g., type: ['dom', 'bem'])
-                // Return only the first for now; caller should handle arrays
-                name += '_' + mod
-            } else if (vals === true) {
-                name += '_' + mod
-            } else {
-                name += '_' + mod + '_' + vals
-            }
-        }
-    }
-
-    return name
-}
 
 /**
  * Expands a BEM dependency entity into one or more module names.
@@ -709,7 +676,6 @@ export {
     parseDepsFile,
     normalizeDeps,
     normalizeDep,
-    bemEntityToModuleName,
     expandBemEntity,
     buildRegistry,
     generateBarrel,

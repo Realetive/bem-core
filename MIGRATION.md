@@ -1676,6 +1676,24 @@ collections.
 **`i-bem-dom__init_auto` is native**: DOMContentLoaded/readyState instead of
 the jQuery ready handler. The test harness no longer ships jQuery.
 
+### S6 Platform + wrapper removal: jquery gone, platform levels override-only
+
+**jQuery removed**: the `jquery` wrapper block (`common.blocks/jquery/` +
+`desktop.blocks/jquery/`) is deleted; jquery is no longer a peer/dev
+dependency. The package no longer ships jQuery.
+
+**UMD dist format dropped**: only the ES module payload remains
+(`dist/desktop/bem-core.mjs`, `dist/touch/bem-core.mjs`). The UMD build and
+its global-jQuery dependency are gone.
+
+**Platform levels are override-only (CONST-P6 ∅)**: every platform file was
+deleted or hoisted to common — `page__conditional-comment` (IE-only) deleted,
+`page__icon` hoisted to `common.blocks/page/__icon/`, and the `page`/`ua`
+templates collapsed to common (touch rendering replaces the IE-era desktop
+form: viewport/zoom meta + apple-mobile-web-app; `doctype`/`X-UA-Compatible`/
+`ua_js_no`/`scripts`/`favicon` handling removed). The `ua` block's `orient` mod
+is now common (the touch-only `ua__dom` delta is folded into the base).
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js

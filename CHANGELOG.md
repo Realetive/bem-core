@@ -17,6 +17,9 @@
 - **Dom events are native (S4)**: `_domEvents()` runs on a per-scope native delegation engine — one listener per node and type, an inclusive `composedPath()` walk with compile-once single-class matchers, focus/blur → focusin/focusout mapping; handlers receive the native event (see MIGRATION → "S4 Events core: native delegation engine").
 - **BEM events are registry-based (S5)**: `_emit()` runs on a pure per-entity-name binding registry with a containment-chain walk (no `$.event.special`); handler `this`/`e.bemTarget` parity preserved (see MIGRATION → "S5 BEM events + plugin: pure registry; jquery exit").
 - **`domElem` is a native collection (S5)**: `entity.domElem` is now an array-like `DomCollection`, not a jQuery collection; `$.fn.bem` is removed in favor of `bemDom.initOnDom`/`getFromDom` (see MIGRATION → "S5 BEM events + plugin: pure registry; jquery exit").
+- **jQuery removed (S6)**: the `jquery` wrapper block and the jquery peer/dev dependency are gone — the package no longer ships jQuery (see MIGRATION → "S6 Platform + wrapper removal").
+- **UMD dist format dropped (S6)**: only the ES module payload remains (see MIGRATION → "S6 Platform + wrapper removal").
+- **Platform levels are override-only (S6)**: every platform file was deleted or hoisted to common; the `page`/`ua` templates collapsed to common and the IE-era desktop rendering was removed; `ua`'s `orient` mod is now common (see MIGRATION → "S6 Platform + wrapper removal").
 
 ### Features
 
