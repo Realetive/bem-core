@@ -5,7 +5,7 @@
 // Imports are in canonical sorted order; cross-module ordering rides
 // static bem: import edges, not list order.
 
-// desktop: 39 modules
+// desktop: 37 modules
 
 import 'bem:cookie';
 import 'bem:dom';
@@ -33,8 +33,6 @@ import 'bem:identify';
 import 'bem:idle';
 import 'bem:idle_start_auto';
 import 'bem:inherit';
-import 'bem:jquery';
-import 'bem:jquery__config';
 import 'bem:keyboard__codes';
 import 'bem:loader';
 import 'bem:next-tick';

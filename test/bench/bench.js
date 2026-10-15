@@ -5,7 +5,7 @@
  */
 
 import bemDom from 'bem:i-bem-dom'
-import $ from 'bem:jquery'
+import DomCollection from 'bem:i-bem-dom__dom'
 
 const ROUNDS = 9,
     TREE_SIZE = 1000,
@@ -91,7 +91,7 @@ function scenario(rounds, measure, aggregate) {
 function b1Init() {
     return scenario(ROUNDS, () => {
         const root = buildTree('bench-b', TREE_SIZE)
-        const ms = timeRound(() => bemDom.init($(root)))
+        const ms = timeRound(() => bemDom.init(new DomCollection([root])))
         root.remove()
         return ms
     })
@@ -101,7 +101,7 @@ function b2Dispatch() {
     return scenario(ROUNDS, () => {
         clickDelivered = 0
         const root = buildTree('bench-click', B2_SIZE)
-        bemDom.init($(root))
+        bemDom.init(new DomCollection([root]))
         const nodes = root.querySelectorAll('.bench-click')
         const ms = timeRound(() => {
             nodes.forEach(node => node.dispatchEvent(
@@ -116,7 +116,7 @@ function b2Dispatch() {
 function b3Emit() {
     return scenario(ROUNDS, () => {
         const root = buildTree('bench-emit', 1)
-        bemDom.init($(root))
+        bemDom.init(new DomCollection([root]))
         const block = lastEmitBlock
         block._hits = 0
         const ms = timeRound(() => {
@@ -131,7 +131,7 @@ function b3Emit() {
 function b4LiveCollection() {
     return scenario(ROUNDS, () => {
         const root = buildTree('bench-parent', 1, true)
-        bemDom.init($(root))
+        bemDom.init(new DomCollection([root]))
         const parent = lastParent
         const ms = timeRound(() => {
             for(let i = 0; i < B4_LOOKUPS; i++) parent.findChildBlocks(ChildBlock)
@@ -148,8 +148,8 @@ function b5DestructNoLeak() {
         const before = performance.memory.usedJSHeapSize
 
         const root = buildTree('bench-b', B5_SIZE)
-        bemDom.init($(root))
-        bemDom.destruct($(root))
+        bemDom.init(new DomCollection([root]))
+        bemDom.destruct(new DomCollection([root]))
         root.remove()
 
         gc()

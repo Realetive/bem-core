@@ -138,31 +138,6 @@ describe('parseModulesDefine (redefinition detection)', function() {
 // --- parseModulesDefine: real file detection ---
 
 describe('parseModulesDefine (real file cross-check)', function() {
-    it('real file: jquery base is now ESM (migrated)', function() {
-        const source = readFileSync(resolve(ROOT, 'common.blocks/jquery/jquery.js'), 'utf8');
-        const result = parseModulesDefine(source);
-        assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
-        assert.ok(source.includes('export default'), 'should have export default');
-    });
-
-    it('real file: jquery__config base is now ESM (migrated)', function() {
-        const source = readFileSync(
-            resolve(ROOT, 'common.blocks/jquery/__config/jquery__config.js'), 'utf8'
-        );
-        const result = parseModulesDefine(source);
-        assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
-        assert.ok(source.includes('export default'), 'should have export default');
-    });
-
-    it('real file: jquery__config desktop is now ESM (migrated)', function() {
-        const source = readFileSync(
-            resolve(ROOT, 'desktop.blocks/jquery/__config/jquery__config.js'), 'utf8'
-        );
-        const result = parseModulesDefine(source);
-        assert.strictEqual(result, null, 'migrated ESM file has no modules.define');
-        assert.ok(source.includes('export default'), 'should have export default');
-    });
-
     it('real file: events__observable base is now ESM (migrated)', function() {
         const source = readFileSync(
             resolve(ROOT, 'common.blocks/events/__observable/events__observable.js'), 'utf8'
@@ -215,7 +190,6 @@ describe('scanLevel', function() {
     it('scans common.blocks and finds modules', function() {
         const modules = scanLevel(resolve(ROOT, 'common.blocks'));
         assert.ok(modules.size > 0, 'Should find modules');
-        assert.ok(modules.has('jquery'), 'Should find jquery');
         assert.ok(modules.has('i-bem'), 'Should find i-bem');
         assert.ok(modules.has('i-bem-dom'), 'Should find i-bem-dom');
         assert.ok(modules.has('events'), 'Should find events');
@@ -237,7 +211,6 @@ describe('scanLevel', function() {
 
     it('scans desktop.blocks', function() {
         const modules = scanLevel(resolve(ROOT, 'desktop.blocks'));
-        assert.ok(modules.has('jquery__config'), 'Should find jquery__config on desktop');
         assert.ok(!modules.has('ua'), 'ua desktop fork deleted (S1: bem:ua resolves to common alias)');
     });
 
@@ -256,10 +229,10 @@ describe('scanLevel', function() {
         const modules = scanLevel(resolve(ROOT, 'common.blocks'));
         assert.ok(modules.has('events__observable_type_bem-dom'),
             'Should derive module name from filename');
-        const jqEntries = modules.get('jquery');
-        assert.ok(jqEntries, 'jquery base should still exist');
-        assert.strictEqual(jqEntries.length, 1,
-            'jquery should have exactly 1 entry (base only, no within-level redefinitions)');
+        const uaEntries = modules.get('ua');
+        assert.ok(uaEntries, 'ua base should exist');
+        assert.strictEqual(uaEntries.length, 1,
+            'ua should have exactly 1 entry (base only)');
     });
 
     it('finds new modules from BEM naming', function() {
@@ -277,7 +250,6 @@ describe('buildRegistry', function() {
     it('builds registry for desktop platform', function() {
         const reg = buildRegistry(['common.blocks', 'desktop.blocks'], ROOT);
         assert.ok(reg.modules.size > 0);
-        assert.ok(reg.modules.has('jquery'));
         assert.ok(reg.modules.has('ua'));
         assert.ok(reg.modules.has('i-bem-dom'));
     });
@@ -290,21 +262,13 @@ describe('buildRegistry', function() {
         assert.ok(reg.modules.has('ua__dom'), 'ua__dom is a separate module');
     });
 
-    it('jquery has single entry per level (BEM naming)', function() {
-        const reg = buildRegistry(['common.blocks', 'desktop.blocks'], ROOT);
-        const jquery = reg.modules.get('jquery');
-        assert.ok(jquery, 'jquery should exist');
-        assert.strictEqual(jquery.length, 1,
-            'jquery should have exactly 1 entry (only common.blocks/jquery/jquery.js)');
-    });
-
-    it('detects jquery__config cross-level redefinition on desktop', function() {
-        const reg = buildRegistry(['common.blocks', 'desktop.blocks'], ROOT);
-        assert.ok(reg.redefinitions.has('jquery__config'), 'jquery__config should have redefinitions');
-        const entries = reg.redefinitions.get('jquery__config');
+    it('detects ua__dom cross-level redefinition on touch', function() {
+        const reg = buildRegistry(['common.blocks', 'touch.blocks'], ROOT);
+        assert.ok(reg.redefinitions.has('ua__dom'), 'ua__dom should have redefinitions');
+        const entries = reg.redefinitions.get('ua__dom');
         assert.strictEqual(entries.length, 2);
         assert.ok(entries[0].filePath.includes('common.blocks'));
-        assert.ok(entries[1].filePath.includes('desktop.blocks'));
+        assert.ok(entries[1].filePath.includes('touch.blocks'));
     });
 
     it('events__observable has no cross-level redefinition (type_bem-dom is separate module)', function() {
@@ -347,15 +311,14 @@ describe('buildRegistry', function() {
             'i-bem__internal', 'uri__querystring', 'strings__escape',
             'events__channels',
             // common.blocks .js
-            'cookie', 'dom', 'dom__facade', 'jquery', 'idle', 'idle_start_auto',
+            'cookie', 'dom', 'dom__facade', 'idle', 'idle_start_auto',
             'keyboard__codes', 'loader', 'env',
             'events__observable', 'events__observable_type_bem-dom',
             'i-bem__collection', 'i-bem-dom', 'i-bem-dom__collection',
             'i-bem-dom__init', 'i-bem-dom__init_auto',
             'i-bem-dom__events', 'i-bem-dom__events_type_bem',
-            'i-bem-dom__events_type_dom', 'jquery__config',
-            // ua resolves from common since the S1 fork collapse;
-            // jquery__event_type_winresize was deleted in S2
+            'i-bem-dom__events_type_dom',
+            // ua resolves from common since the S1 fork collapse
             'ua',
         ];
 
@@ -370,7 +333,7 @@ describe('buildRegistry', function() {
 describe('transformer-form validation', function() {
     it('live repo: all redefinition chains pass validation (desktop)', function() {
         const reg = buildRegistry(['common.blocks', 'desktop.blocks'], ROOT);
-        assert.ok(reg.redefinitions.size > 0, 'jquery__config chain must exist');
+        assert.strictEqual(reg.redefinitions.size, 0, 'desktop has no cross-level redefinitions after S6');
     });
 
     it('live repo: all redefinition chains pass validation (touch)', function() {

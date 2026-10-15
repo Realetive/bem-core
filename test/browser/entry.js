@@ -39,8 +39,6 @@ import stringsEscape from 'bem:strings__escape';
 import events from 'bem:events';
 import eventsObservable from 'bem:events__observable';
 
-import 'bem:jquery__config';
-
 import dom from 'bem:dom';
 import cookie from 'bem:cookie';
 import tick from 'bem:tick';

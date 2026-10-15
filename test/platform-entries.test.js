@@ -62,6 +62,13 @@ const SLICE_REMOVALS = {
         desktop: ['bem:jquery__event_type_winresize'],
         touch: [],
     },
+    // S6: the jquery wrapper block is deleted — the jquery payload leaves both
+    // platforms, jquery__config (common) goes with it.
+    S6: {
+        both: ['bem:jquery', 'bem:jquery__config'],
+        desktop: [],
+        touch: [],
+    },
 };
 
 function expectedTokens(platform, baselineSource) {
