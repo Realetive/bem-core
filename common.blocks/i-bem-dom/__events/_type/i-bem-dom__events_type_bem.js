@@ -39,11 +39,44 @@ const EVENT_PREFIX = '__bem__',
     },
 
     /**
+     * @class EventManager
+     * @augments i-bem-dom__events:EventManager
+     * jQuery-transport seams (interim until S5's pure registry)
+     */
+    jQueryEventManager = inherit(bemDomEvents.EventManager, {
+        _bindToDom : function(event, handler, params, data) {
+            const bindDomElem = params.bindDomElem,
+                bindSelector = params.bindSelector;
+
+            bindDomElem.on(event, bindSelector, data, handler);
+            bindSelector && bindDomElem.is(bindSelector) && bindDomElem.on(event, data, handler);
+        },
+
+        _unbindFromDom : function(event, handler, params) {
+            const bindDomElem = params.bindDomElem,
+                bindSelector = params.bindSelector;
+
+            bindDomElem.off(event, bindSelector, handler);
+            bindSelector && bindDomElem.is(bindSelector) && bindDomElem.off(event, handler);
+        }
+    }),
+
+    /**
      * @class EventManagerFactory
      * @augments i-bem-dom__events:EventManagerFactory
      * @exports i-bem-dom__events_type_bem:EventManagerFactory
      */
     EventManagerFactory = inherit(bemDomEvents.EventManagerFactory,/** @lends EventManagerFactory.prototype */{
+        __constructor : function(getEntityCls) {
+            this.__base(getEntityCls);
+            this._eventManagerCls = jQueryEventManager;
+        },
+
+        _finalizeParams : function(params) {
+            params.bindDomElem = $(params.bindNodes);
+            return params;
+        },
+
         /** @override */
         _createEventManager : function(ctx, params, isInstance) {
             function wrapperFn(fn, fnCtx, fnId) {

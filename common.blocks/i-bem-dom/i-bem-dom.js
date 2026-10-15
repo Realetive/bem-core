@@ -61,7 +61,9 @@ const buildClassName = bemInternal.buildClassName
 
 const reverse = Array.prototype.reverse
 
-const domEventManagerFactory = new domEvents.EventManagerFactory(getEntityCls)
+const domEventManagerFactory = new domEvents.EventManagerFactory(
+    getEntityCls,
+    (domNode, BemDomEntity) => bemDom.initOnDom(domNode, BemDomEntity))
 const bemEventManagerFactory = new bemEvents.EventManagerFactory(getEntityCls)
 
 // eslint-disable-next-line prefer-const -- assigned later as object literal

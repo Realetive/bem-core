@@ -1,23 +1,23 @@
-modules.define('spec', [
-    'i-bem',
-    'i-bem-dom',
-    'objects',
-    'jquery',
-    'chai',
-    'sinon',
-    'BEMHTML'
-], function(provide,
-    bem,
-    bemDom,
-    objects,
-    $,
-    chai,
-    sinon,
-    BEMHTML
-) {
+import bem from 'bem:i-bem'
+import bemDom from 'bem:i-bem-dom'
+import objects from 'bem:objects'
+import { expect } from 'chai'
+import sinon from 'sinon'
+import BEMHTML from '../../../../test/browser/bemhtml-shim.js'
 
-var undef,
-    expect = chai.expect;
+var undef;
+
+// native dispatch helper: trigger-time extra handler args ride CustomEvent
+// detail and the engine spreads them back positionally
+function trigger(target, type) {
+    const node = target.jquery ? target[0] : target
+    const extra = Array.prototype.slice.call(arguments, 2)
+    node.dispatchEvent(new CustomEvent(type, {
+        bubbles : true,
+        cancelable : true,
+        detail : extra.length ? extra : null
+    }))
+}
 
 describe('DOM events', function() {
     var Block1, Block2, Block3, block1, spy1, spy2, spy3, spy4, spy5, spy6, spy7, spy8,
@@ -84,7 +84,7 @@ describe('DOM events', function() {
             });
 
             it('should properly bind handlers', function() {
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.have.been.called;
                 spy2.should.have.been.called;
@@ -96,20 +96,20 @@ describe('DOM events', function() {
 
             it('should pass data to handler', function() {
                 var data = { test : 'data' };
-                block1.domElem.trigger('click', data);
+trigger(block1.domElem, 'click', data);
 
                 spy1.args[0][1].should.have.been.equal(data);
             });
 
             it('should properly bind once handler', function() {
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.have.been.called;
 
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.have.been.calledOnce;
 
                 block1._domEvents().once('click', spy4);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.have.been.calledTwice;
             });
 
@@ -118,17 +118,17 @@ describe('DOM events', function() {
                     .on('click', spy6)
                     .on('click', spy6);
 
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy6.should.have.been.calledOnce;
 
                 block1._domEvents().un('click', spy6);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy6.should.have.been.calledOnce;
             });
 
             it('should properly unbind all handlers', function() {
                 block1._domEvents().un('click');
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -136,7 +136,7 @@ describe('DOM events', function() {
 
             it('should properly unbind specified handler', function() {
                 block1._domEvents().un('click', spy1);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy3.should.have.been.called;
@@ -144,7 +144,7 @@ describe('DOM events', function() {
 
             it('should unbind only own handlers', function() {
                 block1._domEvents().un('click');
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -154,7 +154,7 @@ describe('DOM events', function() {
 
             it('should properly unbind once handler', function() {
                 block1._domEvents().un('click', spy4);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.not.have.been.called;
             });
 
@@ -163,10 +163,10 @@ describe('DOM events', function() {
                 block1._domEvents().on('click keypress', multiSpy);
 
                 block1._domEvents().un('click', multiSpy);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 multiSpy.should.not.have.been.called;
 
-                block1.domElem.trigger('keypress');
+trigger(block1.domElem, 'keypress');
                 multiSpy.should.have.been.calledOnce;
             });
         });
@@ -227,7 +227,7 @@ describe('DOM events', function() {
 
                     describe('block', function() {
                         it('should properly bind handlers', function() {
-                            block1._elem('e3').domElem.trigger('click');
+trigger(block1._elem('e3').domElem, 'click');
 
                             spy1.should.have.been.called;
                             spy1.should.have.been.calledOn(block1);
@@ -244,27 +244,27 @@ describe('DOM events', function() {
                         });
 
                         it('should properly bind handlers to mixed elem', function() {
-                            block1._elem('e4').domElem.trigger('click');
+trigger(block1._elem('e4').domElem, 'click');
 
                             spy8.should.have.been.called;
                         });
 
                         it('should properly unbind all handlers', function() {
                             block1._domEvents(elem1).un('click');
-                            block1._elem(elem1).domElem.trigger('click');
+trigger(block1._elem(elem1).domElem, 'click');
 
                             spy1.should.not.have.been.called;
                             spy2.should.not.have.been.called;
                             spy3.should.not.have.been.called;
 
-                            elem2.domElem.trigger('click');
+trigger(elem2.domElem, 'click');
 
                             spy5.should.have.been.called;
                         });
 
                         it('should properly unbind specified handler', function() {
                             block1._domEvents(elem1).un('click', spy2);
-                            block1._elem(elem1).domElem.trigger('click');
+trigger(block1._elem(elem1).domElem, 'click');
 
                             spy1.should.have.been.called;
                             spy2.should.not.have.been.called;
@@ -273,7 +273,7 @@ describe('DOM events', function() {
 
                         it('should properly unbind handlers from mixed elem', function() {
                             block1._domEvents('e4').un('click', spy8);
-                            block1._elem('e4').domElem.trigger('click');
+trigger(block1._elem('e4').domElem, 'click');
 
                             spy8.should.not.have.been.called;
                         });
@@ -282,7 +282,7 @@ describe('DOM events', function() {
                     describe('elem instance', function() {
                         it('should properly bind handlers', function() {
                             var e2elem1 = elem2.findChildElem('e1');
-                            e2elem1.domElem.trigger('click');
+trigger(e2elem1.domElem, 'click');
 
                             spy6.should.have.been.called;
                             spy6.should.have.been.calledOn(elem2);
@@ -297,7 +297,7 @@ describe('DOM events', function() {
                             elem2._domEvents(elem1).un('click');
 
                             var e2elem1 = elem2.findChildElem('e1');
-                            e2elem1.domElem.trigger('click');
+trigger(e2elem1.domElem, 'click');
 
                             spy6.should.not.have.been.called;
                             spy7.should.not.have.been.called;
@@ -307,7 +307,7 @@ describe('DOM events', function() {
                             elem2._domEvents(elem1).un('click', spy7);
 
                             var e2elem1 = elem2.findChildElem('e1');
-                            e2elem1.domElem.trigger('click');
+trigger(e2elem1.domElem, 'click');
 
                             spy6.should.have.been.called;
                             spy7.should.not.have.been.called;
@@ -341,12 +341,12 @@ describe('DOM events', function() {
                     });
 
                     it('should properly bind handlers', function() {
-                        block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem.trigger('click');
+trigger(block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.have.been.called;
 
-                        block1._elem('e1').domElem.trigger('click');
+trigger(block1._elem('e1').domElem, 'click');
 
                         spy1.should.have.been.calledTwice;
                         spy2.should.have.been.calledOnce;
@@ -355,7 +355,7 @@ describe('DOM events', function() {
                     it('should properly unbind all handlers', function() {
                         block1._domEvents({ elem : elem1, modName : 'm1', modVal : 'v1' }).un('click');
 
-                        block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem.trigger('click');
+trigger(block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.not.have.been.called;
@@ -364,7 +364,7 @@ describe('DOM events', function() {
                     it('should properly unbind specified handler', function() {
                         block1._domEvents({ elem : elem1, modName : 'm1', modVal : 'v1' }).un('click', spy2);
 
-                        block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem.trigger('click');
+trigger(block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.not.have.been.called;
@@ -408,7 +408,7 @@ describe('DOM events', function() {
 
                 describe('block', function() {
                     it('should properly bind handlers', function() {
-                        block1._elem('e3').domElem.trigger('click');
+trigger(block1._elem('e3').domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy1.should.have.been.calledOn(block1);
@@ -423,7 +423,7 @@ describe('DOM events', function() {
                     });
 
                     it('should properly bind handlers on elem with the same name', function() {
-                        block1._elem('e1').domElem.trigger('click');
+trigger(block1._elem('e1').domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy6.should.not.have.been.called;
@@ -431,20 +431,20 @@ describe('DOM events', function() {
 
                     it('should properly unbind all handlers', function() {
                         block1._domEvents(elem1).un('click');
-                        elem1.domElem.trigger('click');
+trigger(elem1.domElem, 'click');
 
                         spy1.should.not.have.been.called;
                         spy2.should.not.have.been.called;
                         spy3.should.not.have.been.called;
 
-                        elem2.domElem.trigger('click');
+trigger(elem2.domElem, 'click');
 
                         spy5.should.have.been.called;
                     });
 
                     it('should properly unbind specified handler', function() {
                         block1._domEvents(elem1).un('click', spy2);
-                        elem1.domElem.trigger('click');
+trigger(elem1.domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.not.have.been.called;
@@ -481,7 +481,7 @@ describe('DOM events', function() {
             });
 
             it('should properly bind handlers', function() {
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
 
                 spy1.should.have.been.called;
                 spy2.should.have.been.called;
@@ -492,14 +492,14 @@ describe('DOM events', function() {
             });
 
             it('should properly bind once handler', function() {
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
                 spy4.should.have.been.called;
 
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
                 spy4.should.have.been.calledOnce;
 
                 block1._domEvents(collection).once('click', spy4);
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
                 spy4.should.have.been.calledTwice;
             });
 
@@ -508,17 +508,17 @@ describe('DOM events', function() {
                     .on('click', spy6)
                     .on('click', spy6);
 
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
                 spy6.should.have.been.calledOnce;
 
                 block1._domEvents(collection).un('click', spy6);
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
                 spy6.should.have.been.calledOnce;
             });
 
             it('should properly unbind all handlers', function() {
                 block1._domEvents(collection).un('click');
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -526,7 +526,7 @@ describe('DOM events', function() {
 
             it('should properly unbind specified handler', function() {
                 block1._domEvents(collection).un('click', spy1);
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy3.should.have.been.called;
@@ -534,7 +534,7 @@ describe('DOM events', function() {
 
             it('should properly unbind once handler', function() {
                 block1._domEvents(collection).un('click', spy4);
-                block1._elem('elem1').domElem.trigger('click');
+trigger(block1._elem('elem1').domElem, 'click');
                 spy4.should.not.have.been.called;
             });
         });
@@ -560,7 +560,7 @@ describe('DOM events', function() {
             });
 
             it('should properly bind handlers', function() {
-                bemDom.doc.trigger('click');
+trigger(bemDom.doc, 'click');
 
                 spy1.should.have.been.called;
                 spy2.should.have.been.called;
@@ -570,42 +570,42 @@ describe('DOM events', function() {
             });
 
             it('should properly bind once handler', function() {
-                bemDom.doc.trigger('click');
+trigger(bemDom.doc, 'click');
                 spy4.should.have.been.called;
 
-                bemDom.doc.trigger('click');
+trigger(bemDom.doc, 'click');
                 spy4.should.have.been.calledOnce;
 
                 block1._domEvents(bemDom.doc).once('click', spy4);
-                bemDom.doc.trigger('click');
+trigger(bemDom.doc, 'click');
                 spy4.should.have.been.calledTwice;
             });
 
             it('should properly unbind all handlers', function() {
                 block1._domEvents(document).un('click');
-                bemDom.doc.trigger('click');
+trigger(bemDom.doc, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
             });
 
             it('should properly unbind specified handler', function() {
-                block1._domEvents($(document)).un('click', spy1);
-                bemDom.doc.trigger('click');
+                block1._domEvents(document).un('click', spy1);
+trigger(bemDom.doc, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.have.been.called;
             });
 
             it('should properly unbind once handler', function() {
-                block1._domEvents($(document)).un('click', spy4);
-                bemDom.doc.trigger('click');
+                block1._domEvents(document).un('click', spy4);
+trigger(bemDom.doc, 'click');
                 spy4.should.not.have.been.called;
             });
 
             it('should properly unbind all handlers on block destruct', function() {
                 bemDom.destruct(block1.domElem);
-                bemDom.doc.trigger('click');
+trigger(bemDom.doc, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -623,7 +623,7 @@ describe('DOM events', function() {
                                     .on('resize', spy1)
                                     .on('resize', spy2);
 
-                                this._domEvents($(window))
+                                this._domEvents(window)
                                     .on('resize', data, wrapSpy(spy3))
                                     .once('resize', spy4);
                             }
@@ -634,7 +634,7 @@ describe('DOM events', function() {
             });
 
             it('should properly bind handlers', function() {
-                bemDom.win.trigger('resize');
+trigger(bemDom.win, 'resize');
 
                 spy1.should.have.been.called;
                 spy2.should.have.been.called;
@@ -644,42 +644,42 @@ describe('DOM events', function() {
             });
 
             it('should properly bind once handler', function() {
-                bemDom.win.trigger('resize');
+trigger(bemDom.win, 'resize');
                 spy4.should.have.been.called;
 
-                bemDom.win.trigger('resize');
+trigger(bemDom.win, 'resize');
                 spy4.should.have.been.calledOnce;
 
                 block1._domEvents(bemDom.win).once('click', spy4);
-                bemDom.win.trigger('click');
+trigger(bemDom.win, 'click');
                 spy4.should.have.been.calledTwice;
             });
 
             it('should properly unbind all handlers', function() {
                 block1._domEvents(window).un('resize');
-                bemDom.win.trigger('resize');
+trigger(bemDom.win, 'resize');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
             });
 
             it('should properly unbind specified handler', function() {
-                block1._domEvents($(window)).un('resize', spy1);
-                bemDom.win.trigger('resize');
+                block1._domEvents(window).un('resize', spy1);
+trigger(bemDom.win, 'resize');
 
                 spy1.should.not.have.been.called;
                 spy2.should.have.been.called;
             });
 
             it('should properly unbind once handler', function() {
-                block1._domEvents($(window)).un('resize', spy4);
-                bemDom.win.trigger('resize');
+                block1._domEvents(window).un('resize', spy4);
+trigger(bemDom.win, 'resize');
                 spy4.should.not.have.been.called;
             });
 
             it('should properly unbind all handlers on block destruct', function() {
                 bemDom.destruct(block1.domElem);
-                bemDom.win.trigger('resize');
+trigger(bemDom.win, 'resize');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -715,12 +715,12 @@ describe('DOM events', function() {
             });
 
             it('should properly bind handlers', function() {
-                rootNode.trigger('click');
+trigger(rootNode, 'click');
 
                 spy1.should.have.been.calledOnce;
                 spy2.should.have.been.calledOnce;
 
-                rootNode.find('div').trigger('dblclick');
+trigger(rootNode.find('div'), 'dblclick');
 
                 spy3.should.have.been.calledTwice;
                 spy3.should.have.been.calledOn(block1);
@@ -728,26 +728,26 @@ describe('DOM events', function() {
             });
 
             it('should properly bind once handler', function() {
-                rootNode.trigger('dblclick');
+trigger(rootNode, 'dblclick');
                 spy4.should.have.been.called;
 
-                rootNode.trigger('dblclick');
+trigger(rootNode, 'dblclick');
                 spy4.should.have.been.calledOnce;
 
                 block1._domEvents(rootNode.find('div').addBack()).once('dblclick', spy4);
-                rootNode.trigger('dblclick');
+trigger(rootNode, 'dblclick');
                 spy4.should.have.been.calledTwice;
             });
 
             it('should properly unbind all handlers', function() {
                 block1._domEvents(rootNode[0]).un('click');
-                rootNode.trigger('click');
+trigger(rootNode, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
 
                 block1._domEvents(rootNode.find('div').addBack()).un('dblclick');
-                rootNode.find('div').trigger('dblclick');
+trigger(rootNode.find('div'), 'dblclick');
 
                 spy3.should.not.have.been.called;
                 spy4.should.not.have.been.called;
@@ -755,7 +755,7 @@ describe('DOM events', function() {
 
             it('should properly unbind specified handler', function() {
                 block1._domEvents(rootNode[0]).un('click', spy1);
-                rootNode.trigger('click');
+trigger(rootNode, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.have.been.called;
@@ -763,13 +763,13 @@ describe('DOM events', function() {
 
             it('should properly unbind once handler', function() {
                 block1._domEvents(rootNode.find('div').addBack()).un('dblclick', spy4);
-                rootNode.find('div').trigger('dblclick');
+trigger(rootNode.find('div'), 'dblclick');
                 spy4.should.not.have.been.called;
             });
 
             it('should properly unbind all handlers on block destruct', function() {
                 bemDom.destruct(block1.domElem);
-                rootNode.trigger('click');
+trigger(rootNode, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -820,7 +820,7 @@ describe('DOM events', function() {
             });
 
             it('should properly bind handlers', function() {
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.have.been.called;
                 spy2.should.have.been.called;
@@ -831,20 +831,20 @@ describe('DOM events', function() {
             });
 
             it('should properly bind once handler', function() {
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.have.been.called;
 
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.have.been.calledOnce;
 
                 block1._domEvents().once('click', spy4);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.have.been.calledTwice;
             });
 
             it('should properly unbind all handlers', function() {
                 Block1._domEvents().un('click');
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -852,7 +852,7 @@ describe('DOM events', function() {
 
             it('should properly unbind specified handler', function() {
                 Block1._domEvents().un('click', spy1);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy3.should.have.been.called;
@@ -860,7 +860,7 @@ describe('DOM events', function() {
 
             it('should unbind only own handlers', function() {
                 Block1._domEvents().un('click');
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
 
                 spy1.should.not.have.been.called;
                 spy2.should.not.have.been.called;
@@ -870,17 +870,17 @@ describe('DOM events', function() {
 
             it('should properly unbind once handler', function() {
                 Block1._domEvents().un('click', spy4);
-                block1.domElem.trigger('click');
+trigger(block1.domElem, 'click');
                 spy4.should.not.have.been.called;
             });
 
             it('should properly bind to self with modifier', function() {
                 var blocks = block1.findChildBlocks(Block3);
 
-                blocks.get(0).domElem.trigger('click');
+trigger(blocks.get(0).domElem, 'click');
                 spy6.should.not.have.been.called;
 
-                blocks.get(1).domElem.trigger('click');
+trigger(blocks.get(1).domElem, 'click');
                 spy6.should.have.been.called;
             });
         });
@@ -932,7 +932,7 @@ describe('DOM events', function() {
 
                     describe('block', function() {
                         it('should properly bind handlers', function() {
-                            block1._elem('e3').domElem.trigger('click');
+trigger(block1._elem('e3').domElem, 'click');
 
                             spy1.should.have.been.called;
                             spy1.should.have.been.calledOn(block1);
@@ -950,7 +950,7 @@ describe('DOM events', function() {
 
                         it('should properly unbind all handlers', function() {
                             Block1._domEvents(elem1).un('click');
-                            block1._elem(elem1).domElem.trigger('click');
+trigger(block1._elem(elem1).domElem, 'click');
 
                             spy1.should.not.have.been.called;
                             spy2.should.not.have.been.called;
@@ -959,7 +959,7 @@ describe('DOM events', function() {
 
                         it('should properly unbind specified handler', function() {
                             Block1._domEvents(elem1).un('click', spy2);
-                            block1._elem(elem1).domElem.trigger('click');
+trigger(block1._elem(elem1).domElem, 'click');
 
                             spy1.should.have.been.called;
                             spy2.should.not.have.been.called;
@@ -970,7 +970,7 @@ describe('DOM events', function() {
                     describe('elem instance', function() {
                         it('should properly bind handlers', function() {
                             var e2elem1 = elem2.findChildElem('e1');
-                            e2elem1.domElem.trigger('click');
+trigger(e2elem1.domElem, 'click');
 
                             spy6.should.have.been.called;
                             spy6.should.have.been.calledOn(elem2);
@@ -985,7 +985,7 @@ describe('DOM events', function() {
                             Elem2._domEvents(elem1).un('click');
 
                             var e2elem1 = elem2.findChildElem('e1');
-                            e2elem1.domElem.trigger('click');
+trigger(e2elem1.domElem, 'click');
 
                             spy6.should.not.have.been.called;
                             spy7.should.not.have.been.called;
@@ -995,7 +995,7 @@ describe('DOM events', function() {
                             Elem2._domEvents(elem1).un('click', spy7);
 
                             var e2elem1 = elem2.findChildElem('e1');
-                            e2elem1.domElem.trigger('click');
+trigger(e2elem1.domElem, 'click');
 
                             spy6.should.have.been.called;
                             spy7.should.not.have.been.called;
@@ -1025,12 +1025,12 @@ describe('DOM events', function() {
                     });
 
                     it('should properly bind handlers', function() {
-                        block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem.trigger('click');
+trigger(block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.have.been.called;
 
-                        block1._elem('e1').domElem.trigger('click');
+trigger(block1._elem('e1').domElem, 'click');
 
                         spy1.should.have.been.calledTwice;
                         spy2.should.have.been.calledOnce;
@@ -1039,7 +1039,7 @@ describe('DOM events', function() {
                     it('should properly unbind all handlers', function() {
                         Block1._domEvents({ elem : elem1, modName : 'm1', modVal : 'v1' }).un('click');
 
-                        block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem.trigger('click');
+trigger(block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.not.have.been.called;
@@ -1048,7 +1048,7 @@ describe('DOM events', function() {
                     it('should properly unbind specified handler', function() {
                         Block1._domEvents({ elem : elem1, modName : 'm1', modVal : 'v1' }).un('click', spy2);
 
-                        block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem.trigger('click');
+trigger(block1._elem({ elem : 'e1', modName : 'm1', modVal : 'v1' }).domElem, 'click');
 
                         spy1.should.have.been.called;
                         spy2.should.not.have.been.called;
@@ -1058,12 +1058,74 @@ describe('DOM events', function() {
             });
         });
     });
-});
 
-provide();
+    describe('focus/blur delegation (native focusin/focusout mapping)', function() {
+        var rootNode, elemInput;
+
+        beforeEach(function() {
+            Block1 = bemDom.declBlock('block', {
+                onSetMod : {
+                    'js' : {
+                        'inited' : function() {
+                            this._domEvents('input')
+                                .on('focus', spy1)
+                                .on('blur', spy2);
+                        }
+                    }
+                }
+            });
+
+            rootNode = createDomNode({
+                block : 'block',
+                content : { elem : 'input', tag : 'input' }
+            });
+            document.body.appendChild(rootNode[0]);
+            block1 = rootNode.bem(Block1);
+            elemInput = rootNode.find('input')[0];
+        });
+
+        afterEach(function() {
+            rootNode.remove();
+        });
+
+        it('should delegate focus through focusin', function() {
+            elemInput.focus();
+            spy1.should.have.been.called;
+            spy1.args[0][0].type.should.be.equal('focusin');
+        });
+
+        it('should delegate blur through focusout', function() {
+            elemInput.focus();
+            elemInput.blur();
+            spy2.should.have.been.called;
+            spy2.args[0][0].type.should.be.equal('focusout');
+        });
+    });
+
+    describe('bem-type interop (mixed flow)', function() {
+        it('should run dom and bem handlers on one entity in the same flow', function() {
+            Block1 = bemDom.declBlock('block', {
+                onSetMod : {
+                    'js' : {
+                        'inited' : function() {
+                            this._domEvents().on('click', spy1);
+                            this._events().on('go', spy2);
+                        }
+                    }
+                }
+            });
+
+            block1 = createDomNode({ block : 'block' }).bem(Block1);
+
+            trigger(block1.domElem, 'click');
+            block1._emit('go');
+
+            spy1.should.have.been.called;
+            spy2.should.have.been.called;
+        });
+    });
+});
 
 function createDomNode(bemjson) {
     return bemDom.init(BEMHTML.apply(bemjson));
 }
-
-});

@@ -1638,6 +1638,24 @@ loose liveness floor.
 **Old benchmark relics deleted**: `benchmarks.blocks` (b1/b2/page) and
 `benchmarks.bemjson.js` are superseded by the bench project.
 
+### S4 Events core: native delegation engine
+
+**Dom events are native (breaking edges)**: `_domEvents()` bindings no longer
+route through jQuery delegation — per-scope native listeners (one per node
+and type), an inclusive `composedPath()` walk with single-class matchers, and
+a focus/blur → focusin/focusout mapping replace it. Visible changes:
+
+- handlers receive the native event object (not a jQuery event); bind-time
+  data rides `e.data`, trigger-time extra args ride `CustomEvent `detail`
+  and spread positionally after the event;
+- focus/blur handlers observe the mapped `focusin`/`focusout` types;
+- the delegated self-match now fires by design (the old jQuery compensation
+  quirk is absorbed by the inclusive path walk);
+- event objects are shared between handlers; `e.bemTarget`/`e.data` are set
+  per binding right before each handler call.
+
+BEM events (`_events()`) still ride the jQuery transport until S5.
+
 **Root export repurposed as the named-export API barrel.** The package root `.` used to resolve to the side-effect desktop payload (`import 'bem-core'` imported the whole library and auto-initialized it). It now resolves to the platform-neutral named-export barrel `dist/index.mjs` (never auto-inits):
 
 ```js

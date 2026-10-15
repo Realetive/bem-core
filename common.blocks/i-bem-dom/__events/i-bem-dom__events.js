@@ -5,7 +5,6 @@ import bemInternal from 'bem:i-bem__internal'
 import BemDomCollection from 'bem:i-bem-dom__collection'
 import inherit from 'bem:inherit'
 import identify from 'bem:identify'
-import $ from 'bem:jquery'
 import functions from 'bem:functions'
 
 const winNode = window
@@ -64,8 +63,6 @@ const EventManager = inherit(/** @lends EventManager.prototype */{
         const fnId = identify(fn, _fnCtx)
 
         if(!fnStorage.get(fnId)) {
-            const bindDomElem = params.bindDomElem
-            const bindSelector = params.bindSelector
             const _this = this
             const handler = this._fnWrapper(
                 _isOnce?
@@ -78,8 +75,7 @@ const EventManager = inherit(/** @lends EventManager.prototype */{
                 fnId)
             fnStorage.set(fnId, handler)
 
-            bindDomElem.on(event, bindSelector, data, handler)
-            bindSelector && bindDomElem.is(bindSelector) && bindDomElem.on(event, data, handler)
+            this._bindToDom(event, handler, params, data)
             // FIXME: "once" won't properly work in case of nested and mixed elem with the same name
         }
     },
@@ -120,17 +116,12 @@ const EventManager = inherit(/** @lends EventManager.prototype */{
                 } else {
                     const fnId = identify(fn, _fnCtx)
                     const fnStorage = this._storage.get(singleEvent)
-                    const bindDomElem = params.bindDomElem
-                    const bindSelector = params.bindSelector
 
                     let wrappedFn
                     if(wrappedFn = fnStorage && fnStorage.get(fnId))
                         fnStorage.delete(fnId)
 
-                    const handler = wrappedFn || fn
-
-                    bindDomElem.off(singleEvent, params.bindSelector, handler)
-                    bindSelector && bindDomElem.is(bindSelector) && bindDomElem.off(singleEvent, handler)
+                    this._unbindFromDom(singleEvent, wrappedFn || fn, params)
                 }
             })
         } else {
@@ -141,16 +132,31 @@ const EventManager = inherit(/** @lends EventManager.prototype */{
     },
 
     _unbindByEvent(fnStorage, e) {
-        const params = this._params
-        const bindDomElem = params.bindDomElem
-        const bindSelector = params.bindSelector
-        const unbindWithoutSelector = bindSelector && bindDomElem.is(bindSelector)
-
         fnStorage && fnStorage.forEach((fn) => {
-            bindDomElem.off(e, bindSelector, fn)
-            unbindWithoutSelector && bindDomElem.off(e, fn)
+            this._unbindFromDom(e, fn, this._params)
         })
         this._storage.set(e, null)
+    },
+
+    /**
+     * Attaches a built handler to the DOM (type-specific seam)
+     * @param {String} event Event type
+     * @param {Function} handler Built handler
+     * @param {Object} params EventManager parameters
+     * @param {*} [data] Bind-time data exposed as e.data
+     */
+    _bindToDom(event, handler, params, data) {
+        throw new Error('not implemented')
+    },
+
+    /**
+     * Detaches a built handler from the DOM (type-specific seam)
+     * @param {String} event Event type
+     * @param {Function} handler Built handler
+     * @param {Object} params EventManager parameters
+     */
+    _unbindFromDom(event, handler, params) {
+        throw new Error('not implemented')
     }
 })
 
@@ -267,26 +273,30 @@ const EventManagerFactory = inherit(/** @lends EventManagerFactory.prototype */{
     _buildEventManagerParams(bindCtx, bindScope, ctxSelector, ctxCls) {
         const res = {
             bindEntityCls : null,
-            bindDomElem : bindScope,
-            bindToArbitraryDomElem : false,
+            bindNodes : [],
             bindSelector : ctxSelector,
             ctxSelector : ctxSelector,
-            key : ''
+            key : '',
+            bindToArbitraryDomElem : false
         }
 
         if(bindCtx) {
             const typeOfCtx = typeof bindCtx
 
-            if(bindCtx.jquery) {
-                res.bindDomElem = bindCtx
-                res.key = identify.apply(null, bindCtx.get())
+            if(typeOfCtx === 'object' && bindCtx.jquery) { // jQuery chain
+                res.bindNodes = bindCtx.toArray()
+                res.key = identify.apply(null, res.bindNodes)
                 res.bindToArbitraryDomElem = true
             } else if(bindCtx === winNode || bindCtx === docNode || (typeOfCtx === 'object' && bindCtx.nodeType === 1)) { // NOTE: duck-typing check for "is-DOM-element"
-                res.bindDomElem = $(bindCtx)
+                res.bindNodes = [bindCtx]
                 res.key = identify(bindCtx)
                 res.bindToArbitraryDomElem = true
+            } else if(typeOfCtx === 'object' && (Array.isArray(bindCtx) || typeof bindCtx.length === 'number') && !bindCtx.__self) { // array/NodeList of DOM nodes
+                res.bindNodes = Array.from(bindCtx)
+                res.key = identify.apply(null, res.bindNodes)
+                res.bindToArbitraryDomElem = true
             } else if(typeOfCtx === 'object' && bindCtx.__self) { // bem entity instance
-                res.bindDomElem = bindCtx.domElem
+                res.bindNodes = bindCtx.domElem.toArray()
                 res.key = bindCtx._uniqId
                 res.bindEntityCls = bindCtx.__self
             } else if(typeOfCtx === 'string' || typeOfCtx === 'object' || typeOfCtx === 'function') {
@@ -319,7 +329,18 @@ const EventManagerFactory = inherit(/** @lends EventManagerFactory.prototype */{
             res.bindEntityCls = ctxCls
         }
 
-        return res
+        res.bindNodes.length || (res.bindNodes = bindScope.toArray())
+
+        return this._finalizeParams(res)
+    },
+
+    /**
+     * Type hook: post-process params (e.g. wrap nodes into a jQuery chain)
+     * @param {Object} params
+     * @returns {Object}
+     */
+    _finalizeParams(params) {
+        return params
     },
 
     _createEventManager(ctx, params, isInstance) {
@@ -327,4 +348,8 @@ const EventManagerFactory = inherit(/** @lends EventManagerFactory.prototype */{
     }
 })
 
-export default { EventManagerFactory }
+export default {
+    EventManagerFactory,
+    EventManager,
+    CollectionEventManager
+}
