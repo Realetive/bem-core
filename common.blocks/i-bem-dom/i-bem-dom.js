@@ -11,9 +11,23 @@ import inherit from 'bem:inherit'
 import identify from 'bem:identify'
 import objects from 'bem:objects'
 import functions from 'bem:functions'
-import $ from 'bem:jquery'
+import DomCollection from 'bem:i-bem-dom__dom'
 import dom from 'bem:dom'
 import domFacade from 'bem:dom__facade'
+
+function toDom(nodes) {
+    if(nodes instanceof DomCollection) return nodes
+    if(nodes && nodes.jquery) return new DomCollection(nodes.toArray())
+    if(nodes && nodes.nodeType) return new DomCollection([nodes])
+    return new DomCollection(nodes? Array.from(nodes) : [])
+}
+
+/* dedup + document-order sort (replaces \$.uniqueSort) */
+function uniqSort(nodes) {
+    const res = [...new Set(nodes)]
+    res.sort((a, b) => (a.compareDocumentPosition(b) & 4)? 1 : -1)
+    return new DomCollection(res)
+}
 
 /**
  * Storage for DOM elements by unique key
@@ -169,7 +183,7 @@ function initEntity(entityName, domElem, params, ignoreLazyInit, callback) {
 
     const parentDomNode = domNode.parentNode
     if(!parentDomNode || parentDomNode.nodeType === 11) { // jquery doesn't unique disconnected node
-        $.uniqueSort(uniqIdToDomElems.get(uniqId))
+        uniqIdToDomElems.set(uniqId, uniqSort(uniqIdToDomElems.get(uniqId)))
     }
 
     const entityCls = getEntityCls(entityName)
@@ -326,10 +340,10 @@ function buildElemKey(elem) {
  * @param {jQuery|String|BemDomEntity} html
  * @returns {jQuery}
  */
-function getJqueryCollection(html) {
-    if(typeof html === 'string') return $(domFacade.parseHtml(html))
+function getDomCollection(html) {
+    if(typeof html === 'string') return new DomCollection(domFacade.parseHtml(html))
     if(html && html.domElem) return html.domElem
-    return $(html)
+    return new DomCollection(domFacade.parseHtml(html))
 }
 
 /**
@@ -661,8 +675,7 @@ const BemDomEntity = inherit(/** @lends BemDomEntity.prototype */{
                         typeof entity.modVal === 'undefined'?
                             true :
                             entity.modVal) :
-                    entityName) +
-                (onlyFirst? ':first' : '')
+                    entityName)
         const domElems = this.domElem[select](selector)
 
         if(onlyFirst) return domElems[0]?
@@ -673,7 +686,7 @@ const BemDomEntity = inherit(/** @lends BemDomEntity.prototype */{
         const uniqIds = {}
 
         domElems.each((i, domElem) => {
-            const block = initEntity(entityName, $(domElem), undefined, true)._setInitedMod()
+            const block = initEntity(entityName, toDom(domElem), undefined, true)._setInitedMod()
             if(!uniqIds[block._uniqId]) {
                 uniqIds[block._uniqId] = true
                 res.push(block)
@@ -692,7 +705,7 @@ const BemDomEntity = inherit(/** @lends BemDomEntity.prototype */{
      * @returns {EventManager}
      */
     _domEvents : function(ctx) {
-        const bindScope = ctx === document || ctx === window ? $(ctx) : this.domElem
+        const bindScope = ctx === document || ctx === window ? toDom(ctx) : this.domElem
         return domEventManagerFactory.getEventManager(this, ctx, bindScope)
     },
 
@@ -764,7 +777,7 @@ const BemDomEntity = inherit(/** @lends BemDomEntity.prototype */{
                         this.className = className.replace(
                             classNameRE,
                             (needDel? '' : '$1' + modClassName)) :
-                        needDel || $(this).addClass(modClassName)
+                        needDel || this.classList.add(modClassName)
             })
         }
     },
@@ -951,14 +964,27 @@ const Elem = inherit([bem.Elem, BemDomEntity], /** @lends Elem.prototype */{
 })
 
 /**
- * Returns a block on a DOM element and initializes it if necessary
+ * Returns a block on a DOM collection and initializes it if necessary
  * @param {Function} BemDomEntity entity
  * @param {Object} [params] entity parameters
  * @returns {BemDomEntity|null}
  */
-$.fn.bem = function(BemDomEntity, params) {
+DomCollection.prototype.bem = function(BemDomEntity, params) {
     const entity = initEntity(BemDomEntity.getEntityName(), this, params, true)
     return entity? entity._setInitedMod() : null
+}
+
+/**
+ * Dispatches a native DOM event with trigger-time extra handler args
+ * @param {String} type Event type
+ * @param {...*} extra Positional handler args (via CustomEvent detail)
+ */
+DomCollection.prototype.trigger = function(type, ...extra) {
+    const detail = extra.length? extra : null
+    this.forEach(node => {
+        node.dispatchEvent(new CustomEvent(type, { bubbles : true, cancelable : true, detail }))
+    })
+    return this
 }
 
 /**
@@ -1084,7 +1110,7 @@ bemDom = {
      */
     init : function(ctx) {
         ctx = typeof ctx === 'string'?
-            $(ctx) :
+            new DomCollection(domFacade.parseHtml(ctx)) :
             ctx || bemDom.scope
 
         const dropElemCacheQueue = {}
@@ -1092,7 +1118,7 @@ bemDom = {
 
         // NOTE: we find only js-entities, so cahced elems without js can't be dropped from cache
         findDomElem(ctx, BEM_SELECTOR).each(function() {
-            initEntities($(this), uniqInitId, dropElemCacheQueue)
+            initEntities(toDom(this), uniqInitId, dropElemCacheQueue)
         })
 
         bem._runInitFns()
@@ -1183,7 +1209,7 @@ bemDom = {
         const prev = ctx.prev()
         const parent = ctx.parent()
 
-        content = getJqueryCollection(content)
+        content = getDomCollection(content)
 
         this.destruct(ctx)
 
@@ -1199,7 +1225,7 @@ bemDom = {
      * @returns {jQuery} New content
      */
     append : function(ctx, content) {
-        return this.init(getJqueryCollection(content).appendTo(ctx))
+        return this.init(getDomCollection(content).appendTo(ctx))
     },
 
     /**
@@ -1209,7 +1235,7 @@ bemDom = {
      * @returns {jQuery} New content
      */
     prepend : function(ctx, content) {
-        return this.init(getJqueryCollection(content).prependTo(ctx))
+        return this.init(getDomCollection(content).prependTo(ctx))
     },
 
     /**
@@ -1219,7 +1245,7 @@ bemDom = {
      * @returns {jQuery} New content
      */
     before : function(ctx, content) {
-        return this.init(getJqueryCollection(content).insertBefore(ctx))
+        return this.init(getDomCollection(content).insertBefore(ctx))
     },
 
     /**
@@ -1229,7 +1255,7 @@ bemDom = {
      * @returns {jQuery} New content
      */
     after : function(ctx, content) {
-        return this.init(getJqueryCollection(content).insertAfter(ctx))
+        return this.init(getDomCollection(content).insertAfter(ctx))
     },
 
     /**
@@ -1250,18 +1276,16 @@ bemDom = {
      * @returns {BemDomEntity|null}
      */
     initOnDom : function(domNode, Entity, params) {
-        const domElem = domNode.jquery ? domNode : $(domNode)
+        const domElem = toDom(domNode)
         const entityName = typeof Entity === 'string' ? Entity : Entity.getEntityName()
         const entity = initEntity(entityName, domElem, params, true)
         return entity ? entity._setInitedMod() : null
     }
 }
 
-// Initialize DOM-dependent properties on DOM ready
-$(function() {
-    bemDom.scope = $('body')
-    bemDom.doc = $(document)
-    bemDom.win = $(window)
-})
+// Module scripts run after DOM parse: body/document/window are available
+bemDom.scope = new DomCollection([document.body])
+bemDom.doc = new DomCollection([document])
+bemDom.win = new DomCollection([window])
 
 export default bemDom

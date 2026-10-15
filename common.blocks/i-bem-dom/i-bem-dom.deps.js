@@ -1,8 +1,8 @@
 ({
     shouldDeps : [
         'inherit',
-        'jquery',
         'objects',
+        { elem : 'dom' },
         'functions',
         'dom',
         { elem : 'init' },

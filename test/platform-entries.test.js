@@ -45,6 +45,12 @@ const SLICE_ADDITIONS = {
         desktop: [],
         touch: [],
     },
+    // S5: i-bem-dom's domElem re-typed onto the native DomCollection module.
+    S5: {
+        both: ['bem:i-bem-dom__dom'],
+        desktop: [],
+        touch: [],
+    },
 };
 
 // Authorized payload removals (design doc slice table, cited per entry).

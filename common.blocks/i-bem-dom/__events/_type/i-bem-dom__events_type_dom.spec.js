@@ -10,7 +10,7 @@ var undef;
 // native dispatch helper: trigger-time extra handler args ride CustomEvent
 // detail and the engine spreads them back positionally
 function trigger(target, type) {
-    const node = target.jquery ? target[0] : target
+    const node = target.nodeType? target : target[0]
     const extra = Array.prototype.slice.call(arguments, 2)
     node.dispatchEvent(new CustomEvent(type, {
         bubbles : true,

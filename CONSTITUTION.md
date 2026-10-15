@@ -37,7 +37,7 @@ commit, never on allowlist emptiness alone.
 JQ=$(grep -rl 'jquery' --include='*.deps.js' . 2>/dev/null \
   | grep -v -E '(^|/)(node_modules|dist|\.git)/|(^|/)jquery/' \
   | sed 's|^\./||' | LC_ALL=C sort)
-ALLOW="common.blocks/i-bem-dom/i-bem-dom.deps.js"
+ALLOW=""
 BAD=$(printf '%s\n' "$JQ" | LC_ALL=C comm -23 - <(printf '%s\n' "$ALLOW" | LC_ALL=C sort))
 STALE=$(printf '%s\n' "$ALLOW" | LC_ALL=C comm -13 - <(printf '%s\n' "$JQ" | LC_ALL=C sort))
 [ -z "$BAD" ] || { echo "new jquery consumers: $BAD"; exit 1; }
