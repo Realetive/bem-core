@@ -4,146 +4,167 @@
 import bemDomEvents from 'bem:i-bem-dom__events';
 import bemInternal from 'bem:i-bem__internal';
 import inherit from 'bem:inherit';
-import functions from 'bem:functions';
-import $ from 'bem:jquery';
 import events from 'bem:events';
 
 const EVENT_PREFIX = '__bem__',
     MOD_CHANGE_EVENT = 'modchange',
 
-    specialEvents = $.event.special,
-    specialEventsStorage = {},
+    /* eventName -> Array<binding> (insertion order) */
+    registry = new Map(),
 
-    createSpecialEvent = function(event) {
-        return {
-            setup : function() {
-                specialEventsStorage[event] || (specialEventsStorage[event] = true);
-            },
-            teardown : functions.noop
-        };
+    /* injected by i-bem-dom: (entity) -> [entity, ...parent blocks] */
+    containmentWalker = { fn : null },
+
+    /* injected by i-bem-dom: (node, EntityCls) -> closest entity instance (lazy-inits) */
+    instanceResolver = { fn : null };
+
+function eventBuilder(e, params) {
+    return EVENT_PREFIX + params.bindEntityCls.getEntityName() +
+        (typeof e === 'object'?
+            e instanceof events.Event?
+                e.type :
+                /* treat modVal: false as modVal: '' (modifier removal) — #1457 */
+                bemInternal.buildModPostfix(e.modName, e.modVal === false? '' : e.modVal) :
+            e);
+}
+
+/**
+ * @class EventManager
+ * @augments i-bem-dom__events:EventManager
+ * Pure-registry seams (no jQuery transport)
+ */
+const RegistryEventManager = inherit(bemDomEvents.EventManager, {
+    _bindToDom : function(event, handler, params, data, fnId) {
+        let bindings = registry.get(event);
+        if(!bindings) registry.set(event, bindings = []);
+
+        bindings.push({
+            owner : params.ownerEntity,
+            params,
+            fnId,
+            handler,
+            data
+        });
     },
 
-    eventBuilder = function(e, params) {
-        const event = EVENT_PREFIX + params.bindEntityCls.getEntityName() +
-            (typeof e === 'object'?
-                e instanceof events.Event?
-                    e.type :
-                    /* treat modVal: false as modVal: '' (modifier removal) — #1457 */
-                    bemInternal.buildModPostfix(e.modName, e.modVal === false? '' : e.modVal) :
-                e);
+    _unbindFromDom : function(event, handler) {
+        const bindings = registry.get(event);
+        if(!bindings) return;
 
-        specialEvents[event] ||
-            (specialEvents[event] = createSpecialEvent(event));
+        const idx = bindings.findIndex(binding => binding.handler === handler);
+        if(idx >= 0) bindings.splice(idx, 1);
+        if(!bindings.length) registry.delete(event);
+    }
+});
 
-        return event;
+/**
+ * @class EventManagerFactory
+ * @augments i-bem-dom__events:EventManagerFactory
+ * @exports i-bem-dom__events_type_bem:EventManagerFactory
+ */
+const EventManagerFactory = inherit(bemDomEvents.EventManagerFactory, /** @lends EventManagerFactory.prototype */{
+    __constructor : function(getEntityCls) {
+        this.__base(getEntityCls);
+        this._eventManagerCls = RegistryEventManager;
     },
 
-    /**
-     * @class EventManager
-     * @augments i-bem-dom__events:EventManager
-     * jQuery-transport seams (interim until S5's pure registry)
-     */
-    jQueryEventManager = inherit(bemDomEvents.EventManager, {
-        _bindToDom : function(event, handler, params, data) {
-            const bindDomElem = params.bindDomElem,
-                bindSelector = params.bindSelector;
+    /** @override */
+    _createEventManager : function(ctx, params, isInstance) {
+        params.ownerEntity = ctx;
+        params.ownerIsInstance = isInstance;
 
-            bindDomElem.on(event, bindSelector, data, handler);
-            bindSelector && bindDomElem.is(bindSelector) && bindDomElem.on(event, data, handler);
-        },
-
-        _unbindFromDom : function(event, handler, params) {
-            const bindDomElem = params.bindDomElem,
-                bindSelector = params.bindSelector;
-
-            bindDomElem.off(event, bindSelector, handler);
-            bindSelector && bindDomElem.is(bindSelector) && bindDomElem.off(event, handler);
+        function wrapperFn(fn, fnCtx) {
+            return function(e, data) {
+                fn.call(fnCtx || this, e, data);
+            };
         }
-    }),
 
-    /**
-     * @class EventManagerFactory
-     * @augments i-bem-dom__events:EventManagerFactory
-     * @exports i-bem-dom__events_type_bem:EventManagerFactory
-     */
-    EventManagerFactory = inherit(bemDomEvents.EventManagerFactory,/** @lends EventManagerFactory.prototype */{
-        __constructor : function(getEntityCls) {
-            this.__base(getEntityCls);
-            this._eventManagerCls = jQueryEventManager;
-        },
+        return new this._eventManagerCls(params, wrapperFn, eventBuilder);
+    }
+});
 
-        _finalizeParams : function(params) {
-            params.bindDomElem = $(params.bindNodes);
-            return params;
-        },
+function entityDomNode(entity) {
+    return entity.domElem[0];
+}
 
-        /** @override */
-        _createEventManager : function(ctx, params, isInstance) {
-            function wrapperFn(fn, fnCtx, fnId) {
-                return function(e, data, flags, originalEvent) {
-                    if(flags.fns[fnId]) return;
+function containsNode(ctxNode, node) {
+    return Boolean(ctxNode && node && ctxNode.contains(node));
+}
 
-                    let instance,
-                        instanceDomElem;
+function targetMatches(binding, entity) {
+    const params = binding.params;
+    if(params.bindTargetInstance) return entity === params.bindTargetInstance;
+    if(entity.__self !== params.bindEntityCls) return false;
+    if(!params.bindSelector) return true;
+    const cls = params.bindSelector.slice(1);
+    return entityDomNode(entity).classList.contains(cls);
+}
 
-                    if(isInstance) {
-                        instance = ctx;
-                        instanceDomElem = instance.domElem;
-                    } else {
-                        // TODO: we could optimize all these "closest" to a single traversing
-                        instanceDomElem = $(e.target).closest(params.ctxSelector);
-                        instanceDomElem.length && (instance = instanceDomElem.bem(ctx));
-                    }
+/**
+ * Emits a BEM event, walking the containment chain and firing matching
+ * registered bindings (pure registry — no DOM event objects, no $.event.special)
+ * @param {BemDomEntity} ctx Emitting entity
+ * @param {String|Object|events:Event} e Event name / mod description / Event
+ * @param {Object} [data]
+ */
+function emit(ctx, e, data) {
+    let originalEvent;
+    if(typeof e === 'string') {
+        originalEvent = new events.Event(e, ctx);
+    } else if(e.modName) {
+        originalEvent = new events.Event(MOD_CHANGE_EVENT, ctx);
+    } else if(!e.target) {
+        e.target = ctx;
+        originalEvent = e;
+    }
 
-                    // Skip events that bubbled up from nested blocks of the same type (#1525)
-                    if(!params.bindSelector &&
-                        params.bindDomElem.index(e.target) < 0) return
+    const eventName = eventBuilder(e, { bindEntityCls : ctx.__self });
+    const bindings = registry.get(eventName);
+    if(!bindings || !bindings.length) return;
 
-                    if(instance &&
-                        (!flags.propagationStoppedDomNode ||
-                            !$.contains(instanceDomElem[0], flags.propagationStoppedDomNode))) {
-                        originalEvent.data = e.data;
-                        // TODO: do we really need both target and bemTarget?
-                        originalEvent.bemTarget = originalEvent.target;
-                        flags.fns[fnId] = true;
-                        fn.call(fnCtx || instance, originalEvent, data);
+    const flags = { fns : new Set(), stoppedNode : null };
+    const chain = containmentWalker.fn? containmentWalker.fn(ctx) : [ctx];
+    const snapshot = bindings.slice();
 
-                        if(originalEvent.isPropagationStopped()) {
-                            e.stopPropagation();
-                            flags.propagationStoppedDomNode = instanceDomElem[0];
-                        }
-                    }
-                };
-            }
+    for(const entity of chain) {
+        for(const binding of snapshot) {
+            if(!targetMatches(binding, entity)) continue;
+            if(flags.fns.has(binding.fnId)) continue;
+            if(flags.stoppedNode && containsNode(entityDomNode(entity), flags.stoppedNode)) continue;
 
-            return new this._eventManagerCls(params, wrapperFn, eventBuilder);
+            originalEvent.data = binding.data;
+            originalEvent.bemTarget = entity;
+            flags.fns.add(binding.fnId);
+            binding.handler.call(
+                binding.params.ownerIsInstance?
+                    binding.owner :
+                    instanceResolver.fn(ctx.domElem[0], binding.owner),
+                originalEvent,
+                data);
+
+            if(originalEvent.isPropagationStopped()) flags.stoppedNode = entityDomNode(entity);
         }
-    });
+    }
+}
 
 export default {
+    emit : emit,
+    EventManagerFactory : EventManagerFactory,
+
     /**
-     * Emits BEM event
-     * @augments i-bem-dom__events_type_bem
-     * @param {BemDomEntity} ctx
-     * @param {String|Object|events:Event} e Event name
-     * @param {Object} [data]
+     * Injects the containment-walk resolver (set by i-bem-dom to avoid a
+     * circular import)
+     * @param {Function} fn (entity) -> [entity, ...parent blocks]
      */
-    emit : function(ctx, e, data) {
-        let originalEvent;
-        if(typeof e === 'string') {
-            originalEvent = new events.Event(e, ctx);
-        } else if(e.modName) {
-            originalEvent = new events.Event(MOD_CHANGE_EVENT, ctx);
-        } else if(!e.target) {
-            e.target = ctx;
-            originalEvent = e;
-        }
-
-        const event = eventBuilder(e, { bindEntityCls : ctx.__self });
-
-        specialEventsStorage[event] &&
-            ctx.domElem.trigger(event, [data, { fns : {}, propagationStoppedDomNode : null }, originalEvent]);
+    setContainmentWalker : function(fn) {
+        containmentWalker.fn = fn;
     },
 
-    EventManagerFactory : EventManagerFactory
+    /**
+     * Injects the class-level owner-instance resolver
+     * @param {Function} fn (node, EntityCls) -> entity
+     */
+    setInstanceResolver : function(fn) {
+        instanceResolver.fn = fn;
+    }
 };

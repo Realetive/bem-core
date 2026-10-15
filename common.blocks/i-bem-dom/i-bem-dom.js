@@ -64,6 +64,48 @@ const reverse = Array.prototype.reverse
 const domEventManagerFactory = new domEvents.EventManagerFactory(
     getEntityCls,
     (domNode, BemDomEntity) => bemDom.initOnDom(domNode, BemDomEntity))
+
+/**
+ * Walks an entity's block containment chain (itself + same-node block mixes +
+ * ancestor blocks) for BEM-event emission
+ * @param {BemDomEntity} entity
+ * @returns {Array}
+ */
+function getContainmentChain(entity) {
+    const chain = [entity]
+    const seen = new Set([entity._uniqId])
+    let node = entity.domElem[0]
+
+    while(node) {
+        const params = getParams(node)
+        for(const entityName of Object.keys(params)) {
+            if(entityName.includes(ELEM_DELIM)) continue
+            const uniqId = params[entityName].uniqId
+            const instance = uniqId && uniqIdToEntity.get(uniqId)
+            if(instance && !seen.has(uniqId)) {
+                seen.add(uniqId)
+                chain.push(instance)
+            }
+        }
+        node = node.parentElement
+    }
+    return chain
+}
+
+bemEvents.setContainmentWalker(getContainmentChain)
+
+function resolveEntityOn(domNode, EntityCls) {
+    const cls = EntityCls._buildSelector().slice(1)
+    while(domNode) {
+        if(domNode.classList && domNode.classList.contains(cls)) {
+            return bemDom.initOnDom(domNode, EntityCls)
+        }
+        domNode = domNode.parentElement
+    }
+    return null
+}
+
+bemEvents.setInstanceResolver(resolveEntityOn)
 const bemEventManagerFactory = new bemEvents.EventManagerFactory(getEntityCls)
 
 // eslint-disable-next-line prefer-const -- assigned later as object literal

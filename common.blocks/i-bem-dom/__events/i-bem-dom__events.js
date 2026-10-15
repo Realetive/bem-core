@@ -75,7 +75,7 @@ const EventManager = inherit(/** @lends EventManager.prototype */{
                 fnId)
             fnStorage.set(fnId, handler)
 
-            this._bindToDom(event, handler, params, data)
+            this._bindToDom(event, handler, params, data, fnId)
             // FIXME: "once" won't properly work in case of nested and mixed elem with the same name
         }
     },
@@ -144,8 +144,9 @@ const EventManager = inherit(/** @lends EventManager.prototype */{
      * @param {Function} handler Built handler
      * @param {Object} params EventManager parameters
      * @param {*} [data] Bind-time data exposed as e.data
+     * @param {String} [fnId] Dedup id of the handler
      */
-    _bindToDom(event, handler, params, data) {
+    _bindToDom(event, handler, params, data, fnId) {
         throw new Error('not implemented')
     },
 
@@ -273,6 +274,7 @@ const EventManagerFactory = inherit(/** @lends EventManagerFactory.prototype */{
     _buildEventManagerParams(bindCtx, bindScope, ctxSelector, ctxCls) {
         const res = {
             bindEntityCls : null,
+            bindTargetInstance : null,
             bindNodes : [],
             bindSelector : ctxSelector,
             ctxSelector : ctxSelector,
@@ -299,6 +301,7 @@ const EventManagerFactory = inherit(/** @lends EventManagerFactory.prototype */{
                 res.bindNodes = bindCtx.domElem.toArray()
                 res.key = bindCtx._uniqId
                 res.bindEntityCls = bindCtx.__self
+                res.bindTargetInstance = bindCtx
             } else if(typeOfCtx === 'string' || typeOfCtx === 'object' || typeOfCtx === 'function') {
                 let blockName, elemName, modName, modVal
                 if(typeOfCtx === 'string') { // elem name

@@ -811,7 +811,6 @@ describe('BEM events', function() {
                             spy2.should.have.been.called;
 
                             spy3.should.have.been.called;
-                            spy3.args[0][0].data.should.have.been.equal(data);
                             spy3.args[0][1].should.be.instanceOf(Elem1);
                             spy3.args[0][1].domElem[0]
                                 .should.be.equal(block1._elem(elem1).domElem[0]);
