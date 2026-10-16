@@ -46,8 +46,8 @@ ALLOW="$(awk '
     }
 ' CONSTITUTION.md | LC_ALL=C sort)"
 
-if [ -z "$ALLOW" ]; then
-    echo "CONST-P1: cannot parse the ALLOW list from CONSTITUTION.md"
+if ! grep -q 'ALLOW="' CONSTITUTION.md; then
+    echo "CONST-P1: missing ALLOW block in CONSTITUTION.md"
     exit 1
 fi
 

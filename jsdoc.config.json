@@ -1,9 +1,7 @@
 {
     "source": {
         "include": [
-            "common.blocks",
-            "desktop.blocks",
-            "touch.blocks"
+            "common.blocks"
         ],
         "includePattern": ".+\\.(vanilla\\.js|js)$",
         "excludePattern": "(spec|test|__tests__)\\.js$"

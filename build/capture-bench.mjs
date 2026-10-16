@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import process from 'node:process';
 
 const url = process.argv[2] || 'http://localhost:5174/test/bench/index.html';
 
